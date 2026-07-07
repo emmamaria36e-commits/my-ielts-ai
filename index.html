@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="My IELTS AI — AI-powered IELTS listening practice. Turn your vocabulary into real IELTS listening materials.">
+  <title>My IELTS AI — AI-Powered Listening Practice</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/navbar.css">
+  <link rel="stylesheet" href="css/hero.css">
+  <link rel="stylesheet" href="css/generator.css">
+  <link rel="stylesheet" href="css/player.css">
+  <link rel="stylesheet" href="css/result.css">
+  <link rel="stylesheet" href="css/how-it-works.css">
+  <link rel="stylesheet" href="css/modules.css">
+  <link rel="stylesheet" href="css/footer.css">
+</head>
+<body>
+
+  <!-- ========================================
+       NAVBAR
+       ======================================== -->
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <a href="/" class="navbar__logo" aria-label="My IELTS AI Home">
+      <span class="navbar__logo-icon">🎧</span>
+      My IELTS <span class="navbar__logo-accent">AI</span>
+    </a>
+
+    <div class="navbar__links">
+      <a href="#generator" class="navbar__link">AI 听力</a>
+      <a href="#how-it-works" class="navbar__link">学习流程</a>
+      <a href="#modules" class="navbar__link">全能雅思</a>
+    </div>
+
+    <a href="#" class="navbar__cta">登录</a>
+
+    <button class="navbar__menu-btn" aria-label="Toggle menu">
+      ☰
+    </button>
+  </nav>
+
+  <!-- ========================================
+       HERO
+       ======================================== -->
+  <section class="hero" aria-labelledby="hero-title">
+
+    <!-- Background elements -->
+    <div class="hero__grid"></div>
+    <div class="hero__dots" aria-hidden="true">
+      <span class="hero__dot"></span>
+      <span class="hero__dot"></span>
+      <span class="hero__dot"></span>
+      <span class="hero__dot"></span>
+      <span class="hero__dot"></span>
+      <span class="hero__dot"></span>
+    </div>
+
+    <!-- Content -->
+    <div class="hero__content">
+      <div class="hero__badge">
+        <span class="hero__badge-dot" aria-hidden="true"></span>
+        AI-Powered Listening
+      </div>
+
+      <h1 id="hero-title" class="hero__title">
+        把单词变成<span class="hero__title-highlight">听力</span>
+        <br>
+        用 AI 攻克雅思
+        <span class="hero__title-wave" aria-hidden="true">🎧</span>
+      </h1>
+
+      <p class="hero__subtitle">
+        输入你想学的单词，AI 自动生成符合雅思考试难度的听力材料。
+        告别枯燥的单词表，让记单词和练听力同步发生。
+      </p>
+
+      <a href="#generator" class="hero__cta">
+        开始生成听力
+        <span class="hero__cta-arrow">↓</span>
+      </a>
+
+      <!-- Sound wave visualization -->
+      <div class="hero__waveform" aria-hidden="true">
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+        <span class="hero__waveform-bar"></span>
+      </div>
+    </div>
+
+    <!-- Scroll indicator -->
+    <div class="hero__scroll" aria-hidden="true">
+      <div class="hero__scroll-mouse"></div>
+      <span>向下滚动</span>
+    </div>
+  </section>
+
+  <!-- ========================================
+       AI LISTENING GENERATOR
+       ======================================== -->
+  <section id="generator" class="generator-section" aria-labelledby="generator-title">
+
+    <div class="generator__header">
+      <h2 id="generator-title" class="generator__title">🎧 AI 听力生成器</h2>
+      <p class="generator__subtitle">输入单词，选择场景和声音，AI 为你生成雅思听力材料</p>
+    </div>
+
+    <div class="generator-card">
+
+      <!-- ===== Step 1: Word Input ===== -->
+      <div class="generator__step">
+        <span class="generator__step-label">Step 1</span>
+        <h3 class="generator__step-title">📝 输入你今天想学的单词</h3>
+        <div class="tag-input-wrapper" id="tagWrapper">
+          <input
+            type="text"
+            class="tag-input"
+            id="tagInput"
+            placeholder="输入单词后按回车添加，如：environment, economy, sustainable..."
+            aria-label="输入单词"
+          >
+        </div>
+        <p class="tag-input-hint">💡 输入单词后按 <strong>回车</strong> 添加 · 支持一次添加多个</p>
+      </div>
+
+      <div class="generator__divider" aria-hidden="true"></div>
+
+      <!-- ===== Step 2: Scene Selection ===== -->
+      <div class="generator__step">
+        <span class="generator__step-label">Step 2</span>
+        <h3 class="generator__step-title">🎯 选择场景</h3>
+        <div class="scene-cards">
+          <div class="scene-card">
+            <input type="radio" name="scene" id="scene-academic" value="academic-lecture" class="scene-card__input" checked>
+            <label for="scene-academic" class="scene-card__label">
+              <span class="scene-card__icon">🏛️</span>
+              <span class="scene-card__name">Academic<br>Lecture</span>
+            </label>
+          </div>
+          <div class="scene-card">
+            <input type="radio" name="scene" id="scene-campus" value="campus-conversation" class="scene-card__input">
+            <label for="scene-campus" class="scene-card__label">
+              <span class="scene-card__icon">🎓</span>
+              <span class="scene-card__name">Campus<br>Conversation</span>
+            </label>
+          </div>
+          <div class="scene-card">
+            <input type="radio" name="scene" id="scene-daily" value="daily-life" class="scene-card__input">
+            <label for="scene-daily" class="scene-card__label">
+              <span class="scene-card__icon">☕</span>
+              <span class="scene-card__name">Daily<br>Life</span>
+            </label>
+          </div>
+          <div class="scene-card">
+            <input type="radio" name="scene" id="scene-environment" value="environment-nature" class="scene-card__input">
+            <label for="scene-environment" class="scene-card__label">
+              <span class="scene-card__icon">🌿</span>
+              <span class="scene-card__name">Environment<br>&amp; Nature</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="generator__divider" aria-hidden="true"></div>
+
+      <!-- ===== Step 3: Voice Selection ===== -->
+      <div class="generator__step">
+        <span class="generator__step-label">Step 3</span>
+        <h3 class="generator__step-title">🎤 选择声音</h3>
+        <div class="voice-cards">
+          <div class="voice-card">
+            <input type="radio" name="voice" id="voice-british-female" value="british-female" class="voice-card__input" checked>
+            <label for="voice-british-female" class="voice-card__label">
+              <span class="voice-card__flag">🇬🇧</span>
+              <span class="voice-card__info">
+                <span class="voice-card__name">British Female</span>
+                <span class="voice-card__desc">英音女声 · 清晰正式</span>
+              </span>
+              <button class="voice-card__sample" aria-label="试听 British Female" title="试听样本">🔊</button>
+            </label>
+          </div>
+          <div class="voice-card">
+            <input type="radio" name="voice" id="voice-british-male" value="british-male" class="voice-card__input">
+            <label for="voice-british-male" class="voice-card__label">
+              <span class="voice-card__flag">🇬🇧</span>
+              <span class="voice-card__info">
+                <span class="voice-card__name">British Male</span>
+                <span class="voice-card__desc">英音男声 · 沉稳自然</span>
+              </span>
+              <button class="voice-card__sample" aria-label="试听 British Male" title="试听样本">🔊</button>
+            </label>
+          </div>
+          <div class="voice-card">
+            <input type="radio" name="voice" id="voice-australian-female" value="australian-female" class="voice-card__input">
+            <label for="voice-australian-female" class="voice-card__label">
+              <span class="voice-card__flag">🇦🇺</span>
+              <span class="voice-card__info">
+                <span class="voice-card__name">Australian Female</span>
+                <span class="voice-card__desc">澳音女声 · 亲切自然</span>
+              </span>
+              <button class="voice-card__sample" aria-label="试听 Australian Female" title="试听样本">🔊</button>
+            </label>
+          </div>
+          <div class="voice-card">
+            <input type="radio" name="voice" id="voice-american-female" value="american-female" class="voice-card__input">
+            <label for="voice-american-female" class="voice-card__label">
+              <span class="voice-card__flag">🇺🇸</span>
+              <span class="voice-card__info">
+                <span class="voice-card__name">American Female</span>
+                <span class="voice-card__desc">美音女声 · 标准流畅</span>
+              </span>
+              <button class="voice-card__sample" aria-label="试听 American Female" title="试听样本">🔊</button>
+            </label>
+          </div>
+        </div>
+
+        <!-- Voice Studio Placeholder -->
+        <div class="voice-studio-placeholder" aria-label="Voice Studio — Coming Soon">
+          <span class="voice-studio-placeholder__icon">🎙️</span>
+          <div class="voice-studio-placeholder__content">
+            <div class="voice-studio-placeholder__title">Voice Studio</div>
+            <div class="voice-studio-placeholder__desc">上传你的声音范本，用你自己的声音生成听力材料</div>
+          </div>
+          <span class="voice-studio-placeholder__badge">🚧 敬请期待</span>
+        </div>
+      </div>
+
+      <div class="generator__divider" aria-hidden="true"></div>
+
+      <!-- ===== Step 4: Generate Button ===== -->
+      <div class="generator__step">
+        <div class="generator__submit-wrapper">
+          <button class="generator__submit" id="generateBtn" disabled>
+            <span class="generator__submit-spinner" aria-hidden="true"></span>
+            <span class="generator__submit-text">✨ 生成我的听力材料</span>
+            <span class="generator__submit-icon">✨</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================
+       RESULT SECTION (hidden until generation)
+       ======================================== -->
+  <section id="resultSection" class="result-section" aria-labelledby="result-title">
+
+    <div class="result-card">
+
+      <!-- Header -->
+      <div class="result-card__header">
+        <span class="result-card__header-icon">🎧</span>
+        <h2 id="result-title">你的听力材料</h2>
+      </div>
+
+      <!-- ===== Audio Player ===== -->
+      <div class="audio-player" id="audioPlayer">
+        <!-- Voice info -->
+        <div class="audio-player__voice">
+          <span>当前声音：</span>
+          <span class="audio-player__voice-flag">🇬🇧</span>
+          <span class="audio-player__voice-label">British Female</span>
+        </div>
+
+        <!-- Main controls -->
+        <div class="audio-player__controls">
+          <button class="audio-player__play" aria-label="播放">
+            <span class="audio-player__play-icon">▶</span>
+          </button>
+
+          <div class="audio-player__progress-area">
+            <div class="audio-player__progress-bar">
+              <div class="audio-player__progress-fill" style="width: 0%"></div>
+              <div class="audio-player__progress-thumb" style="left: 0%"></div>
+            </div>
+            <div class="audio-player__time">
+              <span class="audio-player__time-current">00:00</span>
+              <span class="audio-player__time-duration">00:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Secondary controls -->
+        <div class="audio-player__secondary">
+          <div class="audio-player__group">
+            <!-- Volume -->
+            <div class="audio-player__volume">
+              <button class="audio-player__volume-btn" aria-label="静音切换">🔊</button>
+              <input
+                type="range"
+                class="audio-player__volume-slider"
+                min="0"
+                max="1"
+                step="0.05"
+                value="0.8"
+                aria-label="音量"
+              >
+            </div>
+
+            <!-- Skip -->
+            <button class="audio-player__skip audio-player__skip-back" aria-label="后退 15 秒">
+              ⏪ 15s
+            </button>
+            <button class="audio-player__skip audio-player__skip-fwd" aria-label="前进 15 秒">
+              15s ⏩
+            </button>
+          </div>
+
+          <!-- Speed -->
+          <div class="audio-player__speed">
+            <button class="audio-player__speed-btn" data-speed="0.75">0.75x</button>
+            <button class="audio-player__speed-btn active" data-speed="1.0">1x</button>
+            <button class="audio-player__speed-btn" data-speed="1.25">1.25x</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Transcript ===== -->
+      <div class="result-card__divider" aria-hidden="true"></div>
+
+      <div class="transcript">
+        <div class="transcript__title">📄 听力原文</div>
+        <div class="transcript__text" id="transcriptText">
+          <!-- Filled dynamically -->
+        </div>
+
+        <!-- Target words -->
+        <div class="target-words" id="targetWords">
+          <!-- Filled dynamically -->
+        </div>
+      </div>
+
+      <!-- ===== Practice Area ===== -->
+      <div class="result-card__divider" aria-hidden="true"></div>
+
+      <div class="practice-area">
+        <div class="practice-area__title">📝 练习区</div>
+        <div class="practice-cards">
+          <div class="practice-card">
+            <span class="practice-card__icon">📝</span>
+            <span class="practice-card__name">填空练习</span>
+            <span class="practice-card__badge">🚧 Coming Soon</span>
+          </div>
+          <div class="practice-card">
+            <span class="practice-card__icon">📊</span>
+            <span class="practice-card__name">逐句精听</span>
+            <span class="practice-card__badge">🚧 Coming Soon</span>
+          </div>
+          <div class="practice-card">
+            <span class="practice-card__icon">📖</span>
+            <span class="practice-card__name">答案解析</span>
+            <span class="practice-card__badge">🚧 Coming Soon</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================
+       HOW IT WORKS
+       ======================================== -->
+  <section id="how-it-works" class="how-it-works" aria-labelledby="how-title">
+    <div class="how-it-works__header">
+      <h2 id="how-title" class="how-it-works__title">📋 三步开始学习</h2>
+      <p class="how-it-works__subtitle">从单词到听力，AI 让一切变得简单</p>
+    </div>
+
+    <div class="how-it-works__steps">
+      <!-- Step 1 -->
+      <div class="how-it-works__step">
+        <div class="how-it-works__step-number">1</div>
+        <span class="how-it-works__step-icon">📥</span>
+        <h3 class="how-it-works__step-title">输入单词</h3>
+        <p class="how-it-works__step-desc">
+          输入你今天想学习或复习的雅思词汇，支持一次添加多个单词
+        </p>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="how-it-works__step">
+        <div class="how-it-works__step-number">2</div>
+        <span class="how-it-works__step-icon">🤖</span>
+        <h3 class="how-it-works__step-title">AI 生成听力</h3>
+        <p class="how-it-works__step-desc">
+          AI 自动将单词融入真实雅思场景，生成听力原文和音频材料
+        </p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="how-it-works__step">
+        <div class="how-it-works__step-number">3</div>
+        <span class="how-it-works__step-icon">🎯</span>
+        <h3 class="how-it-works__step-title">练习 + 巩固</h3>
+        <p class="how-it-works__step-desc">
+          通过填空练习、逐句精听和答案解析，全面巩固听力能力
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================
+       IELTS MODULES — 4-skill overview
+       ======================================== -->
+  <section id="modules" class="modules" aria-labelledby="modules-title">
+    <div class="modules__header">
+      <h2 id="modules-title" class="modules__title">🎯 全能雅思学习</h2>
+      <p class="modules__subtitle">一个平台，覆盖听说读写四项核心技能</p>
+    </div>
+
+    <div class="modules__grid">
+      <!-- Listening — Active -->
+      <a href="#generator" class="module-card module-card--active">
+        <span class="module-card__icon">🎧</span>
+        <h3 class="module-card__title">Listening</h3>
+        <p class="module-card__desc">AI 生成真实场景听力材料，支持多种口音选择</p>
+        <span class="module-card__badge">
+          <span class="module-card__badge-dot" aria-hidden="true"></span>
+          已上线
+        </span>
+      </a>
+
+      <!-- Writing — Coming Soon -->
+      <div class="module-card module-card--soon">
+        <span class="module-card__icon">📝</span>
+        <h3 class="module-card__title">Writing</h3>
+        <p class="module-card__desc">AI 按官方四项评分标准批改作文，逐句精析</p>
+        <span class="module-card__badge">🚧 Coming Soon</span>
+      </div>
+
+      <!-- Reading — Coming Soon -->
+      <div class="module-card module-card--soon">
+        <span class="module-card__icon">📖</span>
+        <h3 class="module-card__title">Reading</h3>
+        <p class="module-card__desc">自适应难度 + 错题归因分析，精准定位薄弱环节</p>
+        <span class="module-card__badge">🚧 Coming Soon</span>
+      </div>
+
+      <!-- Speaking — Coming Soon -->
+      <div class="module-card module-card--soon">
+        <span class="module-card__icon">🎙️</span>
+        <h3 class="module-card__title">Speaking</h3>
+        <p class="module-card__desc">AI 语音对话模拟真实考官，24 小时随时练习</p>
+        <span class="module-card__badge">🚧 Coming Soon</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================
+       FOOTER
+       ======================================== -->
+  <footer class="footer">
+    <div class="footer__inner">
+      <!-- Brand -->
+      <div class="footer__brand">
+        <span class="footer__brand-icon">🎧</span>
+        My IELTS <span class="footer__brand-accent">AI</span>
+      </div>
+
+      <!-- Links -->
+      <div class="footer__links">
+        <a href="#generator" class="footer__link">AI 听力</a>
+        <a href="#how-it-works" class="footer__link">学习流程</a>
+        <a href="#modules" class="footer__link">全能雅思</a>
+      </div>
+
+      <!-- Copyright -->
+      <span class="footer__copy">&copy; 2026 My IELTS AI. All rights reserved.</span>
+
+      <!-- CTA -->
+      <a href="#generator" class="footer__cta">开始学习</a>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/generator.js"></script>
+  <script src="js/player.js"></script>
+
+</body>
+</html>
