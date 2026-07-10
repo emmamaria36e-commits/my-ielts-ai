@@ -191,21 +191,50 @@
     // Show loading state
     submitBtn.classList.add('loading');
 
-    // Simulate AI generation delay (will be replaced with real API call)
-    setTimeout(function () {
-      submitBtn.classList.remove('loading');
+    // Call AI Service to generate passage
+    window.AIService.generatePassage({
+      words: words.slice(),
+      scene: scene,
+      voice: voice,
+      difficulty: 'medium',  // Default difficulty; can be made configurable in future versions
+    })
+      .then(function (result) {
+        submitBtn.classList.remove('loading');
 
-      // Dispatch custom event with the collected data
-      var event = new CustomEvent('generator:submit', {
-        detail: {
-          words: words.slice(),
-          scene: scene,
-          voice: voice,
-        },
+        // Dispatch custom event with the result
+        var event = new CustomEvent('generator:submit', {
+          detail: {
+            words: result.targetWords || words.slice(),
+            scene: scene,
+            voice: voice,
+            passage: result.passage,
+            title: result.title,
+            metadata: result.metadata,
+          },
+        });
+
+        document.dispatchEvent(event);
+      })
+      .catch(function (error) {
+        submitBtn.classList.remove('loading');
+        console.error('[Generator] AI generation failed:', error);
+
+        // Show error feedback to user
+        var resultSection = document.getElementById('resultSection');
+        if (resultSection) {
+          resultSection.classList.add('visible');
+          var transcriptText = document.getElementById('transcriptText');
+          if (transcriptText) {
+            transcriptText.innerHTML =
+              '<div style="color: var(--color-error); text-align: center; padding: var(--space-6);">' +
+              '<p style="font-weight: var(--font-semibold); margin-bottom: var(--space-2);">⚠️ 生成失败</p>' +
+              '<p style="font-size: var(--text-sm); color: var(--color-text-secondary);">' + escapeHTML(error.message) + '</p>' +
+              '<p style="font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-3);">请检查网络连接后重试，或联系管理员配置 AI API。</p>' +
+              '</div>';
+          }
+          resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       });
-
-      document.dispatchEvent(event);
-    }, 2000);
   });
 
   /* ========================================
@@ -226,40 +255,12 @@
     'environment-nature':   'Environment & Nature',
   };
 
-  /**
-   * Generate a mock IELTS listening passage using the given words.
-   * In production, this will be replaced by an API call.
-   */
-  function generateMockPassage(words, scene) {
-    var templates = {
-      'academic-lecture': [
-        'In today\'s lecture, we will examine the relationship between <b>{0}</b> and modern society. Many scholars argue that <b>{1}</b> plays a crucial role in shaping public policy. Furthermore, research conducted at leading universities suggests that <b>{2}</b> is becoming increasingly important in the global context. Let us now turn our attention to how these factors interact with one another.',
-      ],
-      'campus-conversation': [
-        'Student: "Professor, I was wondering if you could explain the concept of <b>{0}</b> in more detail?"\n\nProfessor: "Of course. <b>{0}</b> is closely linked to <b>{1}</b>, which we discussed last week. When we consider <b>{2}</b>, we must take into account the broader implications for society."',
-      ],
-      'daily-life': [
-        'I recently read an interesting article about <b>{0}</b> and how it affects our everyday lives. The author pointed out that <b>{1}</b> is something we often take for granted. Additionally, the growing concern over <b>{2}</b> has led many people to reconsider their lifestyle choices.',
-      ],
-      'environment-nature': [
-        'The impact of human activity on the environment has been a topic of heated debate. Scientists have identified <b>{0}</b> as one of the most pressing issues of our time. Without immediate action to address <b>{1}</b>, the consequences for future generations could be severe. Several countries have already implemented policies to promote <b>{2}</b> as a way to combat climate change.',
-      ],
-    };
-
-    var templatesForScene = templates[scene] || templates['academic-lecture'];
-    var template = templatesForScene[0];
-
-    // Fill in the blanks with user words (or fallback)
-    var filledWords = [];
-    for (var i = 0; i < 3; i++) {
-      filledWords.push(words[i] || words[0] || 'this topic');
-    }
-
-    return template
-      .replace('{0}', filledWords[0])
-      .replace('{1}', filledWords[1])
-      .replace('{2}', filledWords[2]);
-  }
+  // ========================================
+  // Passage generation has been moved to
+  // js/services/mockProvider.js (mock)
+  // and js/services/apiProvider.js (real API).
+  // The generate button now calls AIService.generatePassage().
+  // ========================================
 
   /**
    * Highlight user words in the passage HTML.
@@ -282,10 +283,21 @@
     var voice = data.voice || 'british-female';
     var meta = voiceMeta[voice] || voiceMeta['british-female'];
 
-    // Build transcript
-    var rawPassage = generateMockPassage(data.words, data.scene);
+    // Use passage from AI service response
+    var rawPassage = data.passage || '';
+    var title = data.title || '';
+
+    // Highlight target words in the passage
     var highlighted = highlightWords(rawPassage, data.words);
     transcriptText.innerHTML = '<p>' + highlighted.replace(/\n\n/g, '</p><p>') + '</p>';
+
+    // Update result title if we have one
+    var resultTitle = document.getElementById('result-title');
+    if (resultTitle && title) {
+      resultTitle.textContent = title;
+    } else if (resultTitle) {
+      resultTitle.textContent = '你的听力材料';
+    }
 
     // Build target words summary
     if (targetWords) {
