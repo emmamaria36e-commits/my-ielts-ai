@@ -15,4 +15,16 @@
 - **Remaining decisions:** 生产部署平台和 TTS 供应商尚未确定。
 - **Related records:** [DEC-001](DECISION_LOG.md#dec-001--将模型调用迁移到最小-node-后端)、[BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)、[AI-001](AI_COLLABORATION.md#ai-001--从-claude-code-迁移到-codex-并完成-p0-审查)。
 
+## DEV-002 — 建立服务端模型安全边界
+
+- **Date:** 2026-07-22
+- **Milestone:** P0 Step 1
+- **Objective:** 在不重构前端的情况下，将模型密钥和上游请求迁移出浏览器。
+- **Implementation:** 新增无第三方运行依赖的最小 Node 服务、服务端 Prompt、`.env` 配置、输入验证、请求超时、基础频率限制和受控静态资源；前端 API Provider 改为同源 `/api/generate`。
+- **Compatibility:** 直接打开 `index.html` 时继续使用 Mock；通过 Node 服务打开时自动使用后端 API。
+- **Validation:** 全部 JavaScript 通过语法检查；首页、静态资源、健康检查、非法输入、缺少密钥、服务端文件隔离和本地模拟上游端到端请求均通过。
+- **Security result:** 浏览器代码中不再包含 API Key、Authorization Header、上游模型地址或服务端 Prompt。
+- **Not yet verified:** 尚未使用真实供应商密钥进行外部端到端调用；模型响应的严格 Schema、目标词完整性和安全展示属于 P0 Step 2。
+- **Related decision:** [DEC-001](DECISION_LOG.md#dec-001--将模型调用迁移到最小-node-后端)。
+
 后续只在完成重要里程碑或开发阶段发生明显变化时新增记录。

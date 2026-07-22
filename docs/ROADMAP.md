@@ -6,7 +6,7 @@
 
 | Step | Work | Status | Completion condition |
 |---|---|---|---|
-| 1 | 建立最小 Node 后端并迁移模型 API 调用 | Planned | 浏览器不再持有上游密钥或直接调用模型接口 |
+| 1 | 建立最小 Node 后端并迁移模型 API 调用 | Completed | 浏览器不再持有上游密钥或直接调用模型接口 |
 | 2 | 验证模型结果并安全渲染正文 | Planned | 无效结构和缺词结果不能进入成功流程，模型 HTML 不被直接渲染 |
 | 3 | 修复 Mock Provider 业务一致性 | Planned | Mock 成功结果确实包含全部目标词 |
 | 4 | 接入单声音真实 TTS | Planned | 播放器能够播放与正文一致的真实语音 |

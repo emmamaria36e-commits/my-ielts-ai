@@ -6,7 +6,7 @@
 
 - **Date:** 2026-07-22
 - **Status:** Accepted
-- **Implementation:** Planned
+- **Implementation:** Implemented
 
 ### Context
 
@@ -50,5 +50,5 @@
 
 ### Related
 
-- Development record: [DEV-001](DEVELOPMENT_LOG.md#dev-001--p0-architecture-review)
-- Implementation commit: Pending
+- Development records: [DEV-001](DEVELOPMENT_LOG.md#dev-001--p0-architecture-review)、[DEV-002](DEVELOPMENT_LOG.md#dev-002--建立服务端模型安全边界)
+- Implementation: P0 Commit 1

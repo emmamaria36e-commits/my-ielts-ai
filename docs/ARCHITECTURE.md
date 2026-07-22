@@ -4,11 +4,13 @@
 
 ## Current Architecture
 
-当前项目是没有构建步骤的单页应用：
+当前项目由没有构建步骤的单页前端和同仓库最小 Node 服务组成：
 
 ```text
+server.js                    静态资源和受保护的模型 API
+server/promptBuilder.js      服务端可信 Prompt
 index.html
-├─ css/                     页面模块样式
+├─ css/                      页面模块样式
 └─ js/
    ├─ generator.js          输入、生成流程和结果展示
    ├─ player.js             自定义音频播放器
@@ -16,43 +18,53 @@ index.html
       ├─ aiService.js       Provider 选择和统一入口
       ├─ promptBuilder.js   Prompt 与显示元数据
       ├─ mockProvider.js    本地模拟文本
-      └─ apiProvider.js     浏览器端模型请求
+      └─ apiProvider.js      同源 Node API 客户端
 ```
 
 ### Current Request Flow
 
-默认 Mock 模式：
+直接打开 `index.html` 时使用 Mock：
 
 ```text
 Browser → AIService → MockAIProvider → fixed passage → result display
 ```
 
-当前真实 Provider 设计：
+通过 Node 服务访问时使用受保护的真实 Provider 路径：
 
 ```text
-Browser → APIProvider → external model API
+Browser
+  → APIProvider
+  → POST /api/generate with structured parameters
+  → Node validates input and builds the prompt
+  → external model API with server-only credentials
+  → Node returns the normalized result
 ```
 
-真实 Provider 尚不适合生产使用，因为密钥和上游接口配置需要进入浏览器。播放器当前加载的是浏览器生成的短提示音，不是真实语音。
+浏览器不再保存密钥、上游地址或 Authorization Header。Node 只公开首页、`css/`、`js/`、`assets/` 和明确的 API 路由，不公开服务端文件或 `.env`。
 
-## Known P0 Risks
+## Completed P0 Foundation
 
-1. 浏览器直接访问模型接口会暴露 API Key，见 [DEC-001](DECISION_LOG.md#dec-001--将模型调用迁移到最小-node-后端)。
-2. 模型正文通过 `innerHTML` 进入页面，缺少可信边界和安全清理。
-3. Mock Provider 返回固定正文，却把所有输入词报告为已包含，见 [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
-4. 当前音频只是 Web Audio 提示音，没有实现 TTS。
-5. 首页展示范围大于当前 MVP，产品范围以 [PRODUCT.md](PRODUCT.md) 为准。
+- 模型密钥、上游地址和 Prompt 已移到 Node 可信边界，见 [DEC-001](DECISION_LOG.md#dec-001--将模型调用迁移到最小-node-后端)。
+- `/api/generate` 对词汇数量、字符、场景、声音和难度执行服务端验证。
+- 上游请求设置超时，接口包含基础频率限制和受控错误响应。
 
-## Target MVP Architecture — Planned
+## Remaining P0 Risks
+
+1. 模型正文仍通过 `innerHTML` 进入页面，缺少严格响应验证和安全渲染。
+2. Mock Provider 返回固定正文，却把所有输入词报告为已包含，见 [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
+3. 当前音频只是 Web Audio 提示音，没有实现 TTS。
+4. 首页展示范围大于当前 MVP，产品范围以 [PRODUCT.md](PRODUCT.md) 为准。
+
+## Next MVP Architecture Work — Planned
 
 文本生成：
 
 ```text
 Browser
   → POST /api/generate with structured parameters
-  → Node backend validates input and builds the prompt
+  → Node backend validates input and builds the prompt (implemented)
   → AI provider
-  → Node backend validates the provider response
+  → Node backend strictly validates the provider response (planned)
   → Browser renders trusted plain-text fields safely
 ```
 
@@ -69,8 +81,8 @@ Browser
 
 ## Trust Boundaries
 
-- 浏览器不能持有模型或 TTS 密钥。
-- 浏览器只发送业务参数，不能指定任意上游接口或系统 Prompt。
+- 浏览器不能持有模型或 TTS 密钥。模型密钥边界已经实现，TTS 尚未接入。
+- 浏览器只发送业务参数，不能指定任意上游接口或系统 Prompt。该边界已经实现。
 - 用户输入、AI 输出和外部 API 响应均为不可信数据。
 - 模型返回的 JSON 必须经过结构和业务规则验证。
 - 展示层默认使用纯文本节点，不直接渲染模型 HTML。

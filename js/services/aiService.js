@@ -1,71 +1,51 @@
 /* ========================================
    AI Service — Unified interface for passage
-   generation. Automatically selects the
-   appropriate provider based on config.
+   generation. Selects a local mock or the
+   trusted same-origin backend.
 
-   Usage:
-     aiService.generatePassage({
-       words: ['environment', 'sustainable', ...],
-       scene: 'academic-lecture',
-       voices: ['british-female'],
-       difficulty: 'medium',
-     }).then(function (result) {
-       // result = { passage, title, targetWords, metadata }
-     });
-
-   Configuration (optional):
+   Optional browser configuration:
      window.__IELTS_AI_CONFIG = {
-       provider: 'deepseek',      // 'mock' | 'deepseek' | 'openai' | 'custom'
-       apiKey: 'sk-...',          // Required for non-mock providers
-       model: 'deepseek-chat',    // Model name
-       endpoint: '...',           // Custom API endpoint (optional)
+       provider: 'api', // 'mock' | 'api'
      };
+
+  No secrets or upstream endpoints belong in
+  browser configuration.
+
+   Direct file access uses Mock. Pages served by
+   Node use the same-origin API by default.
    ======================================== */
 
 (function () {
   'use strict';
 
-  /* ── Default config ── */
   var DEFAULT_CONFIG = {
-    provider: 'mock',       // Default: use mock (safe, no API key needed)
-    model: 'deepseek-chat',
-    endpoint: 'https://api.deepseek.com/v1/chat/completions',
-    apiKey: '',
+    provider: window.location.protocol === 'file:' ? 'mock' : 'api',
   };
 
-  /**
-   * Merge user config with defaults.
-   */
   function getConfig() {
     var userConfig = window.__IELTS_AI_CONFIG || {};
-    var merged = {};
-    var keys = Object.keys(DEFAULT_CONFIG);
-    for (var i = 0; i < keys.length; i++) {
-      var key = keys[i];
-      merged[key] = (userConfig[key] !== undefined) ? userConfig[key] : DEFAULT_CONFIG[key];
-    }
-    return merged;
+    return {
+      provider: userConfig.provider || DEFAULT_CONFIG.provider,
+    };
   }
 
   /**
    * Generate an IELTS listening passage.
    *
    * @param {Object} params
-   * @param {string[]} params.words        - Target vocabulary words (required)
-   * @param {string}   params.scene        - Scene key (default: 'academic-lecture')
-   * @param {string[]} params.voices       - Voice keys (default: ['british-female'])
-   * @param {string}   params.difficulty   - 'easy' | 'medium' | 'hard' (default: 'medium')
-   * @returns {Promise<Object>} { passage, title, targetWords, metadata }
+   * @param {string[]} params.words      - target vocabulary (required)
+   * @param {string}   params.scene      - scene key
+   * @param {string[]} params.voices     - voice keys
+   * @param {string}   params.difficulty - 'easy' | 'medium' | 'hard'
+   * @returns {Promise<Object>}
    */
   function generatePassage(params) {
     var config = getConfig();
 
-    // Validate required fields
     if (!params.words || params.words.length === 0) {
       return Promise.reject(new Error('At least one target word is required.'));
     }
 
-    // Ensure defaults
     var request = {
       words: params.words,
       scene: params.scene || 'academic-lecture',
@@ -73,36 +53,27 @@
       difficulty: params.difficulty || 'medium',
     };
 
-    // Select provider
-    if (config.provider === 'mock' || !config.apiKey) {
-      // Use mock provider
-      console.log('[AI Service] Using Mock Provider (provider=' + config.provider + ', apiKey=' + (config.apiKey ? 'set' : 'not set') + ')');
+    if (config.provider === 'mock') {
+      console.log('[AI Service] Using Mock Provider.');
       return window.MockAIProvider.generate(request);
     }
 
-    // Use real API provider
-    console.log('[AI Service] Using API Provider (' + config.provider + ', model=' + config.model + ')');
+    console.log('[AI Service] Using same-origin server API.');
     return window.APIProvider.generate(request);
   }
 
-  /**
-   * Get the current provider name.
-   * @returns {string} 'mock' | 'deepseek' | 'openai' | 'custom'
-   */
   function getProviderName() {
     return getConfig().provider;
   }
 
   /**
-   * Check whether a real API is configured.
-   * @returns {boolean}
+   * Indicates whether the browser is configured to use the server API.
+   * The server independently decides whether an upstream provider is ready.
    */
   function isRealAPIConfigured() {
-    var config = getConfig();
-    return config.provider !== 'mock' && !!config.apiKey;
+    return getConfig().provider !== 'mock';
   }
 
-  /* ── Expose ── */
   window.AIService = {
     generatePassage: generatePassage,
     getProviderName: getProviderName,

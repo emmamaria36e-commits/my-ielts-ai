@@ -33,11 +33,18 @@ Writing, Reading, Speaking, user accounts, multi-speaker audio, and Voice Studio
 - Custom HTML audio-player controls
 - Minimal Node backend planned for protected AI and TTS requests
 
-## Current Demo
+## Run the Project
 
-The current version has no build step. Open `index.html` directly or serve the repository with a local static server.
+Node.js 20.12 or newer is required for the server-backed flow.
 
-Do not place API keys in `index.html`, browser configuration, or client-side JavaScript. Real-provider access will be enabled only after the server-side boundary is implemented.
+1. Copy `.env.example` to `.env`.
+2. Add your model provider key and settings to `.env`.
+3. Run `npm start`.
+4. Open `http://localhost:3000`.
+
+Pages served by Node use the protected server API automatically. Opening `index.html` directly uses the offline Mock Provider instead, so the UI can still be reviewed without a key.
+
+Do not place API keys in `index.html`, browser configuration, or client-side JavaScript. The local `.env` file is ignored by Git and is read only by the Node server.
 
 ## Documentation
 

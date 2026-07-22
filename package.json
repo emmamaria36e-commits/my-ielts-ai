@@ -1,0 +1,13 @@
+{
+  "name": "my-ielts-ai",
+  "version": "0.3.0",
+  "private": true,
+  "description": "AI-powered IELTS listening practice MVP",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check server/promptBuilder.js"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}
