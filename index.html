@@ -185,7 +185,7 @@
         <h3 class="generator__step-title">🎤 选择声音</h3>
         <div class="voice-cards">
           <div class="voice-card">
-            <input type="radio" name="voice" id="voice-british-female" value="british-female" class="voice-card__input" checked>
+            <input type="checkbox" name="voice" id="voice-british-female" value="british-female" class="voice-card__input" checked>
             <label for="voice-british-female" class="voice-card__label">
               <span class="voice-card__flag">🇬🇧</span>
               <span class="voice-card__info">
@@ -196,7 +196,7 @@
             </label>
           </div>
           <div class="voice-card">
-            <input type="radio" name="voice" id="voice-british-male" value="british-male" class="voice-card__input">
+            <input type="checkbox" name="voice" id="voice-british-male" value="british-male" class="voice-card__input">
             <label for="voice-british-male" class="voice-card__label">
               <span class="voice-card__flag">🇬🇧</span>
               <span class="voice-card__info">
@@ -207,7 +207,7 @@
             </label>
           </div>
           <div class="voice-card">
-            <input type="radio" name="voice" id="voice-australian-female" value="australian-female" class="voice-card__input">
+            <input type="checkbox" name="voice" id="voice-australian-female" value="australian-female" class="voice-card__input">
             <label for="voice-australian-female" class="voice-card__label">
               <span class="voice-card__flag">🇦🇺</span>
               <span class="voice-card__info">
@@ -218,7 +218,7 @@
             </label>
           </div>
           <div class="voice-card">
-            <input type="radio" name="voice" id="voice-american-female" value="american-female" class="voice-card__input">
+            <input type="checkbox" name="voice" id="voice-american-female" value="american-female" class="voice-card__input">
             <label for="voice-american-female" class="voice-card__label">
               <span class="voice-card__flag">🇺🇸</span>
               <span class="voice-card__info">
@@ -490,6 +490,7 @@
   </footer>
 
   <!-- Scripts: AI Service Layer -->
+  <script src="js/services/promptBuilder.js"></script>
   <script src="js/services/mockProvider.js"></script>
   <script src="js/services/apiProvider.js"></script>
   <script src="js/services/aiService.js"></script>

@@ -184,9 +184,10 @@
     var sceneInput = document.querySelector('input[name="scene"]:checked');
     var scene = sceneInput ? sceneInput.value : null;
 
-    // Collect selected voice
-    var voiceInput = document.querySelector('input[name="voice"]:checked');
-    var voice = voiceInput ? voiceInput.value : null;
+    // Collect selected voices (multi-select)
+    var voiceInputs = document.querySelectorAll('input[name="voice"]:checked');
+    var voices = Array.from(voiceInputs).map(function (el) { return el.value; });
+    if (voices.length === 0) voices = ['british-female'];
 
     // Show loading state
     submitBtn.classList.add('loading');
@@ -195,8 +196,8 @@
     window.AIService.generatePassage({
       words: words.slice(),
       scene: scene,
-      voice: voice,
-      difficulty: 'medium',  // Default difficulty; can be made configurable in future versions
+      voices: voices,
+      difficulty: 'medium',
     })
       .then(function (result) {
         submitBtn.classList.remove('loading');
@@ -206,7 +207,7 @@
           detail: {
             words: result.targetWords || words.slice(),
             scene: scene,
-            voice: voice,
+            voices: voices,
             passage: result.passage,
             title: result.title,
             metadata: result.metadata,
@@ -241,26 +242,8 @@
      Result Display — Mock data for demo
      ======================================== */
 
-  var voiceMeta = {
-    'british-female':     { flag: '🇬🇧', label: 'British Female' },
-    'british-male':       { flag: '🇬🇧', label: 'British Male' },
-    'australian-female':  { flag: '🇦🇺', label: 'Australian Female' },
-    'american-female':    { flag: '🇺🇸', label: 'American Female' },
-  };
-
-  var sceneLabel = {
-    'academic-lecture':     'Academic Lecture',
-    'campus-conversation':  'Campus Conversation',
-    'daily-life':           'Daily Life',
-    'environment-nature':   'Environment & Nature',
-  };
-
-  // ========================================
-  // Passage generation has been moved to
-  // js/services/mockProvider.js (mock)
-  // and js/services/apiProvider.js (real API).
-  // The generate button now calls AIService.generatePassage().
-  // ========================================
+  // Passage generation: see js/services/mockProvider.js and js/services/apiProvider.js.
+  // Lookup tables: use window.PromptBuilder.getVoiceMeta() / getSceneLabel().
 
   /**
    * Highlight user words in the passage HTML.
@@ -280,8 +263,10 @@
     var resultSection = document.getElementById('resultSection');
     var transcriptText = document.getElementById('transcriptText');
     var targetWords = document.getElementById('targetWords');
-    var voice = data.voice || 'british-female';
-    var meta = voiceMeta[voice] || voiceMeta['british-female'];
+    var voices = data.voices || ['british-female'];
+    var meta = window.PromptBuilder
+      ? window.PromptBuilder.getVoiceMeta(voices[0])
+      : { flag: '🇬🇧', label: 'British Female' };
 
     // Use passage from AI service response
     var rawPassage = data.passage || '';
@@ -320,8 +305,8 @@
       resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // Initialize player with demo audio (generated sine wave for demo)
-    initDemoPlayer(voice);
+    // Initialize player with demo audio (primary voice)
+    initDemoPlayer(voices[0]);
   });
 
   function initDemoPlayer(voice) {
@@ -333,13 +318,9 @@
       window._activePlayer.destroy();
     }
 
-    var voiceMetaMap = {
-      'british-female':     { flag: '🇬🇧', label: 'British Female' },
-      'british-male':       { flag: '🇬🇧', label: 'British Male' },
-      'australian-female':  { flag: '🇦🇺', label: 'Australian Female' },
-      'american-female':    { flag: '🇺🇸', label: 'American Female' },
-    };
-    var meta = voiceMetaMap[voice] || voiceMetaMap['british-female'];
+    var meta = window.PromptBuilder
+      ? window.PromptBuilder.getVoiceMeta(voice)
+      : { flag: '🇬🇧', label: 'British Female' };
 
     var player = window.IELTSPlayer.create(container, {
       voiceFlag: meta.flag,
@@ -460,9 +441,9 @@
       var el = document.querySelector('input[name="scene"]:checked');
       return el ? el.value : null;
     },
-    getSelectedVoice: function () {
-      var el = document.querySelector('input[name="voice"]:checked');
-      return el ? el.value : null;
+    getSelectedVoices: function () {
+      var els = document.querySelectorAll('input[name="voice"]:checked');
+      return Array.from(els).map(function (el) { return el.value; });
     },
     addWord: addWord,
     clearWords: function () {

@@ -7,7 +7,7 @@
      aiService.generatePassage({
        words: ['environment', 'sustainable', ...],
        scene: 'academic-lecture',
-       voice: 'british-female',
+       voices: ['british-female'],
        difficulty: 'medium',
      }).then(function (result) {
        // result = { passage, title, targetWords, metadata }
@@ -53,7 +53,7 @@
    * @param {Object} params
    * @param {string[]} params.words        - Target vocabulary words (required)
    * @param {string}   params.scene        - Scene key (default: 'academic-lecture')
-   * @param {string}   params.voice        - Voice key (default: 'british-female')
+   * @param {string[]} params.voices       - Voice keys (default: ['british-female'])
    * @param {string}   params.difficulty   - 'easy' | 'medium' | 'hard' (default: 'medium')
    * @returns {Promise<Object>} { passage, title, targetWords, metadata }
    */
@@ -69,7 +69,7 @@
     var request = {
       words: params.words,
       scene: params.scene || 'academic-lecture',
-      voice: params.voice || 'british-female',
+      voices: params.voices && params.voices.length ? params.voices : ['british-female'],
       difficulty: params.difficulty || 'medium',
     };
 
