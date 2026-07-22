@@ -52,3 +52,44 @@
 
 - Development records: [DEV-001](DEVELOPMENT_LOG.md#dev-001--p0-architecture-review)、[DEV-002](DEVELOPMENT_LOG.md#dev-002--建立服务端模型安全边界)
 - Implementation: P0 Commit 1
+
+## DEC-002 — 模型结果必须验证并以纯文本展示
+
+- **Date:** 2026-07-22
+- **Status:** Accepted
+- **Implementation:** Implemented
+
+### Context
+
+模型输出无法被视为可信数据。原有流程会宽松提取 JSON，并把 passage 作为 HTML 写入页面；异常或恶意内容可能绕过业务要求，甚至被浏览器解释为页面代码。
+
+### Decision
+
+- 模型必须返回只包含纯文本 title 和 passage 的严格 JSON。
+- 服务端负责验证字段类型、长度、HTML 和全部目标词。
+- 验证失败采用 fail-closed：返回错误，不把原始结果交给页面。
+- 前端只使用文本节点展示模型内容，高亮标签由本地可信代码创建。
+
+### Consequences
+
+正面影响：
+
+- 模型无法直接控制页面 HTML。
+- 缺词或结构错误的内容不会被误报为成功。
+- Provider 契约可以通过自动化测试持续验证。
+
+负面影响：
+
+- 不严格遵守 JSON 的模型响应会直接失败。
+- 在获得真实调用数据前，不自动重试或修复失败响应。
+- 目标词匹配暂时以英文单词和短语边界为准。
+
+### Revisit When
+
+获得真实供应商的失败数据后，再评估是否增加一次受控修复请求；不得通过恢复宽松 HTML 或 JSON 解析来降低失败率。
+
+### Related
+
+- Development record: [DEV-003](DEVELOPMENT_LOG.md#dev-003--验证并安全展示模型结果)
+- Bug note: [BUG-002](BUG_NOTES.md#bug-002--模型-html-被直接写入页面)
+- Implementation: P0 Commit 2

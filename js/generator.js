@@ -84,6 +84,42 @@
     return div.innerHTML;
   }
 
+  function clearElement(element) {
+    while (element.firstChild) {
+      element.removeChild(element.firstChild);
+    }
+  }
+
+  function renderGenerationError(container, error) {
+    clearElement(container);
+
+    var panel = document.createElement('div');
+    panel.style.color = 'var(--color-error)';
+    panel.style.textAlign = 'center';
+    panel.style.padding = 'var(--space-6)';
+
+    var heading = document.createElement('p');
+    heading.style.fontWeight = 'var(--font-semibold)';
+    heading.style.marginBottom = 'var(--space-2)';
+    heading.textContent = '⚠️ 生成失败';
+
+    var message = document.createElement('p');
+    message.style.fontSize = 'var(--text-sm)';
+    message.style.color = 'var(--color-text-secondary)';
+    message.textContent = error && error.message ? error.message : '生成过程中发生未知错误。';
+
+    var hint = document.createElement('p');
+    hint.style.fontSize = 'var(--text-xs)';
+    hint.style.color = 'var(--color-text-muted)';
+    hint.style.marginTop = 'var(--space-3)';
+    hint.textContent = '请检查网络连接后重试，或联系管理员检查 AI 服务配置。';
+
+    panel.appendChild(heading);
+    panel.appendChild(message);
+    panel.appendChild(hint);
+    container.appendChild(panel);
+  }
+
   /* ── Event: typing in the input ── */
   tagInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' || e.key === ',') {
@@ -226,12 +262,7 @@
           resultSection.classList.add('visible');
           var transcriptText = document.getElementById('transcriptText');
           if (transcriptText) {
-            transcriptText.innerHTML =
-              '<div style="color: var(--color-error); text-align: center; padding: var(--space-6);">' +
-              '<p style="font-weight: var(--font-semibold); margin-bottom: var(--space-2);">⚠️ 生成失败</p>' +
-              '<p style="font-size: var(--text-sm); color: var(--color-text-secondary);">' + escapeHTML(error.message) + '</p>' +
-              '<p style="font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-3);">请检查网络连接后重试，或联系管理员配置 AI API。</p>' +
-              '</div>';
+            renderGenerationError(transcriptText, error);
           }
           resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -245,17 +276,75 @@
   // Passage generation: see js/services/mockProvider.js and js/services/apiProvider.js.
   // Lookup tables: use window.PromptBuilder.getVoiceMeta() / getSceneLabel().
 
-  /**
-   * Highlight user words in the passage HTML.
-   */
-  function highlightWords(html, words) {
-    var result = html;
-    words.forEach(function (word) {
-      var escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      var regex = new RegExp('(\\b' + escaped + '\\b)', 'gi');
-      result = result.replace(regex, '<span class="transcript__word-highlight">$1</span>');
+  function buildHighlightRegex(words) {
+    var patterns = words
+      .filter(function (word) { return typeof word === 'string' && word.trim(); })
+      .map(function (word) {
+        return word.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      })
+      .sort(function (a, b) { return b.length - a.length; });
+
+    return patterns.length ? new RegExp('\\b(' + patterns.join('|') + ')\\b', 'gi') : null;
+  }
+
+  function appendHighlightedText(parent, text, regex) {
+    if (!regex) {
+      parent.appendChild(document.createTextNode(text));
+      return;
+    }
+
+    regex.lastIndex = 0;
+    var lastIndex = 0;
+    var match;
+
+    while ((match = regex.exec(text)) !== null) {
+      parent.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+
+      var highlight = document.createElement('span');
+      highlight.className = 'transcript__word-highlight';
+      highlight.textContent = match[0];
+      parent.appendChild(highlight);
+
+      lastIndex = regex.lastIndex;
+    }
+
+    parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+  }
+
+  function renderTranscript(container, passage, words) {
+    clearElement(container);
+    var regex = buildHighlightRegex(words);
+    var paragraphs = String(passage || '').split(/\n+/).filter(function (paragraph) {
+      return paragraph.trim();
     });
-    return result;
+
+    paragraphs.forEach(function (paragraph) {
+      var element = document.createElement('p');
+      appendHighlightedText(element, paragraph, regex);
+      container.appendChild(element);
+    });
+  }
+
+  function renderTargetWords(container, words) {
+    clearElement(container);
+
+    var label = document.createElement('span');
+    label.className = 'target-words__label';
+    label.textContent = '🎯 目标词汇：';
+    container.appendChild(label);
+
+    words.forEach(function (word) {
+      var item = document.createElement('span');
+      item.className = 'target-words__word';
+
+      var check = document.createElement('span');
+      check.className = 'target-words__check';
+      check.textContent = '✓';
+
+      item.appendChild(check);
+      item.appendChild(document.createTextNode(' ' + word));
+      container.appendChild(item);
+    });
   }
 
   document.addEventListener('generator:submit', function (e) {
@@ -272,9 +361,10 @@
     var rawPassage = data.passage || '';
     var title = data.title || '';
 
-    // Highlight target words in the passage
-    var highlighted = highlightWords(rawPassage, data.words);
-    transcriptText.innerHTML = '<p>' + highlighted.replace(/\n\n/g, '</p><p>') + '</p>';
+    // Render untrusted passage as text and add trusted highlight elements.
+    if (transcriptText) {
+      renderTranscript(transcriptText, rawPassage, data.words || []);
+    }
 
     // Update result title if we have one
     var resultTitle = document.getElementById('result-title');
@@ -286,11 +376,7 @@
 
     // Build target words summary
     if (targetWords) {
-      targetWords.innerHTML =
-        '<span class="target-words__label">🎯 目标词汇：</span>' +
-        data.words.map(function (w) {
-          return '<span class="target-words__word"><span class="target-words__check">✓</span> ' + escapeHTML(w) + '</span>';
-        }).join('');
+      renderTargetWords(targetWords, data.words || []);
     }
 
     // Update voice info in player

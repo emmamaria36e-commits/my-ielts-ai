@@ -8,10 +8,9 @@ My IELTS AI is moving from a static UI demo into a focused Listening MVP. The cu
 
 The following parts are not production-ready yet:
 
-- Real-provider requests still need a server-side security boundary.
-- AI output validation and safe transcript rendering are pending.
 - The Mock Provider does not yet guarantee that submitted words appear in its passage.
 - Audio is currently a short demo tone rather than real text-to-speech.
+- A real model provider has not yet been tested with production credentials.
 
 ## MVP Goal
 
@@ -31,7 +30,7 @@ Writing, Reading, Speaking, user accounts, multi-speaker audio, and Voice Studio
 - Vanilla HTML, CSS, and JavaScript
 - Provider-based AI generation layer
 - Custom HTML audio-player controls
-- Minimal Node backend planned for protected AI and TTS requests
+- Minimal Node backend for protected AI requests and validated model results
 
 ## Run the Project
 
@@ -45,6 +44,8 @@ Node.js 20.12 or newer is required for the server-backed flow.
 Pages served by Node use the protected server API automatically. Opening `index.html` directly uses the offline Mock Provider instead, so the UI can still be reviewed without a key.
 
 Do not place API keys in `index.html`, browser configuration, or client-side JavaScript. The local `.env` file is ignored by Git and is read only by the Node server.
+
+Run `npm test` to verify the model-result contract, target-word checks, HTML rejection, and safe transcript-rendering guard.
 
 ## Documentation
 

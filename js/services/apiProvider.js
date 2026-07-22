@@ -8,6 +8,17 @@
 (function () {
   'use strict';
 
+  function validatePayload(payload) {
+    if (!payload || typeof payload !== 'object' ||
+        typeof payload.title !== 'string' ||
+        typeof payload.passage !== 'string' ||
+        !Array.isArray(payload.targetWords)) {
+      throw new Error('Server returned an invalid passage result.');
+    }
+
+    return payload;
+  }
+
   /**
    * Generate a passage through the trusted backend.
    *
@@ -43,7 +54,7 @@
                 : 'Passage generation failed.';
               throw new Error(message);
             }
-            return payload;
+            return validatePayload(payload);
           });
       });
   }

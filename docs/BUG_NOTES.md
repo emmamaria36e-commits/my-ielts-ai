@@ -39,3 +39,41 @@ Mock Provider 从目标词占位模板改为固定文章后，仍然直接复制
 
 - Development record: [DEV-001](DEVELOPMENT_LOG.md#dev-001--p0-architecture-review)
 - Fix commit: Pending
+
+## BUG-002 — 模型 HTML 被直接写入页面
+
+- **Discovered:** 2026-07-21
+- **Resolved:** 2026-07-22
+- **Severity:** P0
+- **Status:** Resolved
+- **Affected components:** `server.js`、`server/promptBuilder.js`、`js/generator.js`
+
+### Symptom and Impact
+
+Prompt 要求模型返回 `<b>`，前端随后通过 `innerHTML` 展示 passage。模型如果返回脚本、事件属性或其他 HTML，浏览器可能把不可信内容解释为页面结构和代码。
+
+### Root Cause
+
+模型格式化和页面高亮职责混在一起：模型负责生成 HTML，前端依赖这段 HTML 展示结果，同时服务端只做宽松 JSON 解析，没有建立完整的响应契约。
+
+### Resolution
+
+- 模型只返回纯文本 JSON。
+- 服务端严格验证字段、长度、HTML 和目标词完整性。
+- 前端使用文本节点展示正文，并由可信代码创建高亮 `<span>`。
+- 自动测试禁止恢复 `transcriptText.innerHTML` 和 `targetWords.innerHTML`。
+
+### Validation
+
+- 自动化测试覆盖 HTML、非严格 JSON 和缺词响应。
+- 完整本地请求测试确认不合格响应返回 502，不能进入页面成功流程。
+
+### Prevention
+
+所有 AI 和外部服务内容默认视为不可信数据；格式化只能由本地可信代码生成。
+
+### Related
+
+- Decision: [DEC-002](DECISION_LOG.md#dec-002--模型结果必须验证并以纯文本展示)
+- Development record: [DEV-003](DEVELOPMENT_LOG.md#dev-003--验证并安全展示模型结果)
+- Fix: P0 Commit 2

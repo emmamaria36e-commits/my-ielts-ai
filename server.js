@@ -16,6 +16,10 @@ const MAX_BODY_BYTES = 16 * 1024;
 const REQUEST_TIMEOUT_MS = 30 * 1000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 20;
+const MAX_TITLE_CHARS = 160;
+const MIN_PASSAGE_CHARS = 50;
+const MAX_PASSAGE_CHARS = 8000;
+const HTML_PATTERN = /[<>]/;
 
 const ALLOWED_SCENES = new Set([
   'academic-lecture',
@@ -139,7 +143,7 @@ function validateGenerateRequest(input) {
     if (typeof rawWord !== 'string') {
       throw createHttpError(400, 'Every target word must be text.');
     }
-    const word = rawWord.trim().toLowerCase();
+    const word = rawWord.trim().toLowerCase().replace(/\s+/g, ' ');
     if (!word || word.length > 40 || !WORD_PATTERN.test(word)) {
       throw createHttpError(400, `Invalid target word: ${rawWord}`);
     }
@@ -204,14 +208,50 @@ function parseModelContent(content) {
   try {
     return JSON.parse(content);
   } catch (error) {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw createHttpError(502, 'AI provider returned an unreadable response.');
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch (parseError) {
-      throw createHttpError(502, 'AI provider returned invalid JSON.');
-    }
+    throw createHttpError(502, 'AI provider returned invalid JSON.');
   }
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsTargetWord(passage, targetWord) {
+  const escaped = escapeRegExp(targetWord.trim()).replace(/\s+/g, '\\s+');
+  const pattern = new RegExp(`(^|[^A-Za-z0-9])${escaped}(?=$|[^A-Za-z0-9])`, 'i');
+  return pattern.test(passage);
+}
+
+function validateModelResult(parsed, params) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw createHttpError(502, 'AI provider returned an invalid result structure.');
+  }
+
+  if (typeof parsed.title !== 'string' || typeof parsed.passage !== 'string') {
+    throw createHttpError(502, 'AI result must contain a text title and passage.');
+  }
+
+  const title = parsed.title.trim();
+  const passage = parsed.passage.trim();
+
+  if (!title || title.length > MAX_TITLE_CHARS) {
+    throw createHttpError(502, 'AI result title has an invalid length.');
+  }
+
+  if (passage.length < MIN_PASSAGE_CHARS || passage.length > MAX_PASSAGE_CHARS) {
+    throw createHttpError(502, 'AI result passage has an invalid length.');
+  }
+
+  if (HTML_PATTERN.test(title) || HTML_PATTERN.test(passage)) {
+    throw createHttpError(502, 'AI result must not contain HTML.');
+  }
+
+  const missingWords = params.words.filter((word) => !containsTargetWord(passage, word));
+  if (missingWords.length) {
+    throw createHttpError(502, 'AI result did not include every target word.');
+  }
+
+  return { title, passage };
 }
 
 async function requestPassage(params) {
@@ -269,8 +309,9 @@ async function requestPassage(params) {
     }
 
     const parsed = parseModelContent(content);
-    const passage = typeof parsed.passage === 'string' ? parsed.passage : content;
-    const title = typeof parsed.title === 'string' ? parsed.title : 'Generated Passage';
+    const validated = validateModelResult(parsed, params);
+    const passage = validated.passage;
+    const title = validated.title;
 
     return {
       passage,
@@ -409,5 +450,8 @@ if (require.main === module) {
 
 module.exports = {
   createServer,
+  containsTargetWord,
+  parseModelContent,
   validateGenerateRequest,
+  validateModelResult,
 };

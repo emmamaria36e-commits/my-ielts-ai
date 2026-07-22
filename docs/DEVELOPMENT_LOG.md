@@ -27,4 +27,15 @@
 - **Not yet verified:** 尚未使用真实供应商密钥进行外部端到端调用；模型响应的严格 Schema、目标词完整性和安全展示属于 P0 Step 2。
 - **Related decision:** [DEC-001](DECISION_LOG.md#dec-001--将模型调用迁移到最小-node-后端)。
 
+## DEV-003 — 验证并安全展示模型结果
+
+- **Date:** 2026-07-22
+- **Milestone:** P0 Step 2
+- **Objective:** 防止结构错误、缺少目标词或包含 HTML 的模型内容进入页面成功流程。
+- **Implementation:** Prompt 改为纯文本契约；Node 严格解析 JSON 并验证字段、长度、HTML 和目标词；前端使用文本节点构造段落、错误提示和目标词高亮。
+- **Automated validation:** 8 条测试覆盖输入空格规范化、严格 JSON、字段类型、HTML 拒绝、缺词、大小写、多词短语、单词边界和前端 `innerHTML` 回归保护。
+- **Request validation:** 本地模拟上游中，合格结果返回 200；HTML、缺词和 JSON 外附加文字均返回 502。
+- **Not yet verified:** 尚未使用真实供应商密钥验证严格 JSON 遵从率；自动修复和重试需等待真实失败数据。
+- **Related records:** [DEC-002](DECISION_LOG.md#dec-002--模型结果必须验证并以纯文本展示)、[BUG-002](BUG_NOTES.md#bug-002--模型-html-被直接写入页面)。
+
 后续只在完成重要里程碑或开发阶段发生明显变化时新增记录。
