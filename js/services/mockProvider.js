@@ -1,11 +1,9 @@
 /* ========================================
    Mock AI Provider (development only)
-   Returns pre-written passages per scene.
-   No template placeholders — each passage
-   is a complete, natural IELTS text.
-
-   Replace with APIProvider when connecting
-   to a real AI API (DeepSeek / OpenAI).
+   Returns a stable base passage plus a
+   scene-specific vocabulary-focus paragraph.
+   This is a deterministic development fixture,
+   not a replacement for real AI generation.
    ======================================== */
 
 (function () {
@@ -59,6 +57,62 @@
     'easy': 'Easy', 'medium': 'Medium', 'hard': 'Hard',
   };
 
+  var WORD_PATTERN = /^[A-Za-z][A-Za-z' -]*$/;
+
+  var VOCABULARY_FOCUS = {
+    'academic-lecture': function (wordList) {
+      return 'Before we continue, note the vocabulary focus for this lecture: ' + wordList +
+        '. Each target term appears in this practice so you can identify it in connected speech.';
+    },
+    'campus-conversation': function (wordList) {
+      return 'Professor: "For your vocabulary notes, listen for these target terms: ' + wordList +
+        '. Each term appears in today\'s practice so you can recognise it in conversation."';
+    },
+    'daily-life': function (wordList) {
+      return 'Host: "For today\'s vocabulary focus, listen for: ' + wordList +
+        '. Try to notice each term when you hear it in connected speech."';
+    },
+    'environment-nature': function (wordList) {
+      return 'Narrator: "As you listen, focus on these target terms: ' + wordList +
+        '. Each one appears in this practice to support your listening review."';
+    },
+  };
+
+  function normalizeWords(input) {
+    if (!Array.isArray(input) || input.length < 1 || input.length > 20) {
+      throw new Error('Provide between 1 and 20 target words.');
+    }
+
+    var normalized = [];
+    input.forEach(function (rawWord) {
+      if (typeof rawWord !== 'string') {
+        throw new Error('Every target word must be text.');
+      }
+
+      var word = rawWord.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!word || word.length > 40 || !WORD_PATTERN.test(word)) {
+        throw new Error('Invalid target word: ' + rawWord);
+      }
+
+      if (!normalized.includes(word)) {
+        normalized.push(word);
+      }
+    });
+
+    return normalized;
+  }
+
+  function formatWordList(words) {
+    if (words.length === 1) return words[0];
+    if (words.length === 2) return words[0] + ' and ' + words[1];
+    return words.slice(0, -1).join(', ') + ', and ' + words[words.length - 1];
+  }
+
+  function buildVocabularyFocus(scene, words) {
+    var builder = VOCABULARY_FOCUS[scene] || VOCABULARY_FOCUS['academic-lecture'];
+    return builder(formatWordList(words));
+  }
+
   /**
    * Generate a mock IELTS listening passage.
    *
@@ -70,7 +124,13 @@
    * @returns {Promise<Object>}
    */
   function generate(p) {
-    var words     = p.words || [];
+    var words;
+    try {
+      words = normalizeWords(p.words || []);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
     var scene     = p.scene || 'academic-lecture';
     var voices    = p.voices && p.voices.length ? p.voices : ['british-female'];
     var difficulty = p.difficulty || 'medium';
@@ -85,13 +145,14 @@
 
       setTimeout(function () {
         var entry = PASSAGES[scene] || PASSAGES['academic-lecture'];
+        var passage = entry.passage + '\n\n' + buildVocabularyFocus(scene, words);
 
         if (prompt) {
           console.log('[MockProvider] Prompt that would be sent:\n', prompt.system);
         }
 
         resolve({
-          passage: entry.passage,
+          passage: passage,
           title: entry.title,
           targetWords: words.slice(),
           metadata: {
@@ -99,7 +160,7 @@
             difficulty: difficulty,
             difficultyLabel: DIFFICULTY_LABEL[difficulty] || 'Medium',
             voices: voices,
-            wordCount: entry.passage.split(/\s+/).length,
+            wordCount: passage.split(/\s+/).length,
             generatedBy: 'mock',
             generatedAt: new Date().toISOString(),
           },

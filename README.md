@@ -8,7 +8,6 @@ My IELTS AI is moving from a static UI demo into a focused Listening MVP. The cu
 
 The following parts are not production-ready yet:
 
-- The Mock Provider does not yet guarantee that submitted words appear in its passage.
 - Audio is currently a short demo tone rather than real text-to-speech.
 - A real model provider has not yet been tested with production credentials.
 
@@ -43,9 +42,11 @@ Node.js 20.12 or newer is required for the server-backed flow.
 
 Pages served by Node use the protected server API automatically. Opening `index.html` directly uses the offline Mock Provider instead, so the UI can still be reviewed without a key.
 
+The Mock Provider is a deterministic development fixture: it combines a stable scene passage with a vocabulary-focus paragraph that contains every validated target word. It verifies the application flow but does not represent real AI writing quality.
+
 Do not place API keys in `index.html`, browser configuration, or client-side JavaScript. The local `.env` file is ignored by Git and is read only by the Node server.
 
-Run `npm test` to verify the model-result contract, target-word checks, HTML rejection, and safe transcript-rendering guard.
+Run `npm test` to verify the model-result contract, Mock parity, target-word checks, HTML rejection, and safe transcript-rendering guard.
 
 ## Documentation
 

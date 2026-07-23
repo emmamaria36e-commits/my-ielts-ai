@@ -5,8 +5,9 @@
 ## BUG-001 — Mock Provider 虚假报告目标词已包含
 
 - **Discovered:** 2026-07-21
+- **Resolved:** 2026-07-23
 - **Severity:** P0
-- **Status:** Identified
+- **Status:** Resolved
 - **Affected component:** `js/services/mockProvider.js`
 
 ### Symptom and Impact
@@ -19,26 +20,27 @@
 
 Mock Provider 从目标词占位模板改为固定文章后，仍然直接复制用户输入作为 `targetWords`，但没有验证这些词是否实际存在于 `passage`。
 
-### Resolution Plan
+### Resolution
 
-- 恢复确定性的目标词插入机制。
-- Mock 与真实 Provider 使用相同的目标词完整性检查。
-- 只有通过验证的结果才能进入成功展示流程。
+- Mock 验证并规范化 1–20 个目标词，拒绝非法输入。
+- 每种场景在稳定基础文章后添加对应的 Vocabulary Focus，明确包含全部目标词。
+- `targetWords`、正文和 `wordCount` 使用同一份规范化结果。
+- Mock 输出通过真实 Provider 的 `validateModelResult()` 契约测试。
 
-### Validation Plan
+### Validation
 
-- 分别使用 1、3 和 10 个允许的目标词生成内容。
-- 验证每个被报告成功的词都出现在正文中。
-- 验证大小写、重复词和无效输入边界。
+- 四种场景分别使用 1、3、10 和 20 个目标词通过统一结果契约。
+- 重复词、多余空格、短语、连字符和撇号测试通过。
+- 0 个词、超过 20 个词和 HTML 字符输入会被拒绝。
 
 ### Prevention
 
-为 Provider 成功结果建立统一契约测试，要求正文包含全部目标词。
+保留 Mock 与真实 Provider 的统一契约测试，任何虚假 `targetWords` 回归都会导致测试失败。
 
 ### Related
 
-- Development record: [DEV-001](DEVELOPMENT_LOG.md#dev-001--p0-architecture-review)
-- Fix commit: Pending
+- Development records: [DEV-001](DEVELOPMENT_LOG.md#dev-001--p0-architecture-review)、[DEV-004](DEVELOPMENT_LOG.md#dev-004--恢复-mock-provider-业务一致性)
+- Fix: P0 Commit 3
 
 ## BUG-002 — 模型 HTML 被直接写入页面
 

@@ -38,4 +38,15 @@
 - **Not yet verified:** 尚未使用真实供应商密钥验证严格 JSON 遵从率；自动修复和重试需等待真实失败数据。
 - **Related records:** [DEC-002](DECISION_LOG.md#dec-002--模型结果必须验证并以纯文本展示)、[BUG-002](BUG_NOTES.md#bug-002--模型-html-被直接写入页面)。
 
+## DEV-004 — 恢复 Mock Provider 业务一致性
+
+- **Date:** 2026-07-23
+- **Milestone:** P0 Step 3
+- **Objective:** 确保 Mock 页面显示的每个成功目标词都真实存在于正文。
+- **Implementation:** Mock 验证并规范化目标词；四种场景保留稳定基础文章并添加场景化 Vocabulary Focus；浏览器端调试 Prompt 同步为纯文本契约。
+- **Contract result:** Mock 结果直接通过真实 Provider 使用的 `validateModelResult()`，不再单独定义宽松成功标准。
+- **Validation:** 四种场景分别覆盖 1、3、10、20 个词；重复词、短语、连字符、撇号和非法输入测试通过；测试总数由 8 增加到 11。
+- **Product limitation:** Vocabulary Focus 只保证目标词真实出现，不代表 Mock 能理解任意词义或达到真实 AI 的写作质量。
+- **Related bug:** [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
+
 后续只在完成重要里程碑或开发阶段发生明显变化时新增记录。

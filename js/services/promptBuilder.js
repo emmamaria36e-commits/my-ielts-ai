@@ -97,10 +97,10 @@
       'REQUIREMENTS:',
       '1. Naturally include ALL target words in the passage.',
       '2. Sound like a real IELTS listening test.',
-      '3. Wrap each target word in <b>...</b> on first occurrence.',
+      '3. Return title and passage as plain text. Do not use HTML, XML, Markdown, or code fences.',
       '',
       'Return ONLY valid JSON:',
-      '{ "title": "...", "passage": "..." }',
+      '{ "title": "plain-text title", "passage": "plain-text passage" }',
     ].join('\n');
 
     var user = 'Generate an IELTS listening passage. Return ONLY valid JSON.';

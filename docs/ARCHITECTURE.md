@@ -17,7 +17,7 @@ index.html
    └─ services/
       ├─ aiService.js       Provider 选择和统一入口
       ├─ promptBuilder.js   Prompt 与显示元数据
-      ├─ mockProvider.js    本地模拟文本
+      ├─ mockProvider.js    确定性场景文本与词汇焦点
       └─ apiProvider.js      同源 Node API 客户端
 ```
 
@@ -26,7 +26,12 @@ index.html
 直接打开 `index.html` 时使用 Mock：
 
 ```text
-Browser → AIService → MockAIProvider → fixed passage → result display
+Browser
+  → AIService
+  → MockAIProvider validates and normalizes target words
+  → stable scene passage + scene-specific vocabulary focus
+  → result satisfies the real Provider contract
+  → safe result display
 ```
 
 通过 Node 服务访问时使用受保护的真实 Provider 路径：
@@ -49,12 +54,12 @@ Browser
 - 上游请求设置超时，接口包含基础频率限制和受控错误响应。
 - 模型响应只接受严格 JSON、纯文本 title 和 passage，并验证长度、HTML 和全部目标词。
 - 页面使用文本节点和可信高亮元素展示正文，不将模型内容写入 `innerHTML`，见 [DEC-002](DECISION_LOG.md#dec-002--模型结果必须验证并以纯文本展示)。
+- Mock Provider 会验证输入，并确保全部目标词进入场景化 Vocabulary Focus；其输出通过与真实 Provider 相同的结果契约，见 [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
 
 ## Remaining P0 Risks
 
-1. Mock Provider 返回固定正文，却把所有输入词报告为已包含，见 [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
-2. 当前音频只是 Web Audio 提示音，没有实现 TTS。
-3. 首页展示范围大于当前 MVP，产品范围以 [PRODUCT.md](PRODUCT.md) 为准。
+1. 当前音频只是 Web Audio 提示音，没有实现 TTS。
+2. 首页展示范围大于当前 MVP，产品范围以 [PRODUCT.md](PRODUCT.md) 为准。
 
 ## Current Validated Text Flow
 
@@ -92,7 +97,7 @@ Browser
 - 用户输入、AI 输出和外部 API 响应均为不可信数据。
 - 模型返回的 JSON 必须经过结构和业务规则验证。真实 API 路径已经实现。
 - 展示层默认使用纯文本节点，不直接渲染模型 HTML。该边界已经实现。
-- Mock 与真实 Provider 必须满足相同的成功结果契约。Mock 一致性将在 P0 Step 3 完成。
+- Mock 与真实 Provider 必须满足相同的成功结果契约。该契约已经通过自动测试统一验证。
 
 ## Intentionally Absent
 
