@@ -29,6 +29,17 @@
   color: var(--color-text);
 }
 
+.audio-player__status {
+  min-height: 1.25rem;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.audio-player__status.is-error {
+  color: var(--color-error);
+}
+
 /* ── Main controls row ── */
 .audio-player__controls {
   display: flex;

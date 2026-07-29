@@ -1,130 +1,61 @@
 /* ========================================
-   Prompt Builder
-   Single responsibility: build prompt from
-   params. No strategy, no validation, no
-   deduction — just construct the prompt.
-
-   Usage:
-     var prompt = PromptBuilder.build({
-       words:   ['environment'],
-       scene:   'academic-lecture',
-       voices:  ['british-female'],
-       difficulty: 'medium',
-     });
-     // prompt = { system: '...', user: '...' }
+   Browser Prompt Metadata
+   Mirrors the server-side section descriptions
+   for Mock debugging and result labels. The
+   trusted production prompt lives on the server.
    ======================================== */
 
 (function () {
   'use strict';
 
-  var SCENE = {
-    'academic-lecture':   'a university lecture. Formal academic language, clear structure.',
-    'campus-conversation': 'a conversation between students and/or professors on campus. Natural dialogue with turn-taking.',
-    'daily-life':         'an everyday conversation or podcast about daily life. Casual, natural spoken English.',
-    'environment-nature': 'a talk or documentary about environment and nature. Descriptive, engaging narrative.',
-  };
-
-  var DIFFICULTY = {
-    'easy':   'Intermediate vocabulary. Short sentences. 180-250 words. IELTS Band 5.0-6.0.',
-    'medium': 'Upper-intermediate vocabulary. Varied sentences. 250-350 words. IELTS Band 6.0-7.0.',
-    'hard':   'Advanced vocabulary. Mixed sentence length. 350-450 words. IELTS Band 7.0+.',
-  };
-
-  var VOICE = {
-    'british-female':     'British female (RP, clear, formal)',
-    'british-male':       'British male (RP, steady, natural)',
-    'australian-female':  'Australian female (General Australian, warm)',
-    'american-female':    'American female (General American, fluent)',
+  var SECTION = {
+    'section-1': 'IELTS Listening Section 1 — Everyday Conversation',
+    'section-2': 'IELTS Listening Section 2 — Social Monologue',
+    'section-3': 'IELTS Listening Section 3 — Academic Discussion',
+    'section-4': 'IELTS Listening Section 4 — Academic Lecture',
   };
 
   var VOICE_FLAG = {
-    'british-female':     '🇬🇧',
-    'british-male':       '🇬🇧',
-    'australian-female':  '🇦🇺',
-    'american-female':    '🇺🇸',
+    'british-female': '🇬🇧',
+    'british-male': '🇬🇧',
+    'australian-female': '🇦🇺',
+    'american-female': '🇺🇸',
   };
 
   var VOICE_LABEL = {
-    'british-female':     'British Female',
-    'british-male':       'British Male',
-    'australian-female':  'Australian Female',
-    'american-female':    'American Female',
+    'british-female': 'British Female',
+    'british-male': 'British Male',
+    'australian-female': 'Australian Female',
+    'american-female': 'American Female',
   };
 
-  var SCENE_LABEL = {
-    'academic-lecture':    'Academic Lecture',
-    'campus-conversation': 'Campus Conversation',
-    'daily-life':          'Daily Life',
-    'environment-nature':  'Environment & Nature',
-  };
-
-  /**
-   * Build system + user prompts from params.
-   *
-   * @param {Object}   p
-   * @param {string[]} p.words      - target vocabulary
-   * @param {string}   p.scene      - scene key
-   * @param {string[]} p.voices     - voice keys (array)
-   * @param {string}   p.difficulty - 'easy' | 'medium' | 'hard'
-   * @returns {{ system: string, user: string }}
-   */
-  function build(p) {
-    var words     = p.words || [];
-    var scene     = p.scene || 'academic-lecture';
-    var voices    = p.voices && p.voices.length ? p.voices : ['british-female'];
-    var difficulty = p.difficulty || 'medium';
-
-    var sceneDesc = SCENE[scene] || SCENE['academic-lecture'];
-    var diffDesc  = DIFFICULTY[difficulty] || DIFFICULTY['medium'];
-
-    var voiceList = voices.map(function (v) { return VOICE[v] || v; }).join(' and ');
-    var voiceNames = voices.map(function (v) { return VOICE_LABEL[v] || v; }).join(', ');
-
-    var multiVoice = voices.length > 1;
-    var formatHint = multiVoice
-      ? 'Generate a DIALOGUE with ' + voices.length + ' speakers (' + voiceNames + '). Label each line with speaker names (e.g. "Emma:", "Professor:").'
-      : 'Generate a MONOLOGUE. Write as a continuous passage without speaker labels.';
-
-    var system = [
-      'You are an IELTS listening test creator.',
-      '',
-      'SCENE: ' + sceneDesc,
-      'VOICE: ' + voiceList,
-      'DIFFICULTY: ' + diffDesc,
-      'FORMAT: ' + formatHint,
-      'TARGET WORDS: ' + words.join(', '),
-      '',
-      'REQUIREMENTS:',
-      '1. Naturally include ALL target words in the passage.',
-      '2. Sound like a real IELTS listening test.',
-      '3. Return title and passage as plain text. Do not use HTML, XML, Markdown, or code fences.',
-      '',
-      'Return ONLY valid JSON:',
-      '{ "title": "plain-text title", "passage": "plain-text passage" }',
-    ].join('\n');
-
-    var user = 'Generate an IELTS listening passage. Return ONLY valid JSON.';
-
-    return { system: system, user: user };
+  function build(params) {
+    var section = params.section || 'section-1';
+    return {
+      system: [
+        'You are an expert IELTS Listening script writer.',
+        'TEST PART: ' + (SECTION[section] || SECTION['section-1']),
+        'TARGET WORDS: ' + JSON.stringify(params.words || []),
+        'The production prompt is constructed on the trusted server.',
+      ].join('\n'),
+      user: 'Generate a new IELTS Listening script. Return ONLY valid JSON.',
+    };
   }
 
-  /** Get { flag, label } for a voice key. */
   function getVoiceMeta(voiceKey) {
     return {
-      flag:  VOICE_FLAG[voiceKey] || '🎤',
+      flag: VOICE_FLAG[voiceKey] || '🎤',
       label: VOICE_LABEL[voiceKey] || voiceKey,
     };
   }
 
-  /** Get display label for a scene key. */
-  function getSceneLabel(sceneKey) {
-    return SCENE_LABEL[sceneKey] || sceneKey;
+  function getSectionLabel(sectionKey) {
+    return SECTION[sectionKey] || sectionKey;
   }
 
-  /* ── Expose ── */
   window.PromptBuilder = {
-    build:         build,
-    getVoiceMeta:  getVoiceMeta,
-    getSceneLabel: getSceneLabel,
+    build: build,
+    getVoiceMeta: getVoiceMeta,
+    getSectionLabel: getSectionLabel,
   };
 })();

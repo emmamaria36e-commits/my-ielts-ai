@@ -8,34 +8,72 @@
   /* ── DOM refs ── */
   const tagWrapper = document.getElementById('tagWrapper');
   const tagInput = document.getElementById('tagInput');
+  const tagInputStatus = document.getElementById('tagInputStatus');
   const submitBtn = document.getElementById('generateBtn');
   const submitText = submitBtn?.querySelector('.generator__submit-text');
 
   /* ── State ── */
   const words = [];
+  var activeAudioUrl = '';
 
   /* ========================================
      Tag Input
      ======================================== */
 
-  /**
-   * Add a word to the tag list.
-   * Trims, lowercases, deduplicates, and rejects empty strings.
-   */
-  function addWord(raw) {
-    const word = raw.trim().toLowerCase();
-    if (!word) return;
+  function setTagInputStatus(message, type) {
+    if (!tagInputStatus) return;
+    tagInputStatus.textContent = message || '';
+    tagInputStatus.classList.toggle('is-success', type === 'success');
+    tagInputStatus.classList.toggle('is-error', type === 'error');
+  }
 
-    // Deduplicate
-    if (words.includes(word)) {
-      tagInput.value = '';
+  function reportWordResult(result) {
+    if (result.overflow.length) {
+      setTagInputStatus(
+        '最多添加 20 个词条。本次已添加 ' + result.added.length +
+        ' 个，另有 ' + result.overflow.length + ' 个未添加。',
+        'error'
+      );
       return;
     }
 
-    words.push(word);
-    renderTags();
+    if (result.invalid.length) {
+      setTagInputStatus(
+        '已添加 ' + result.added.length + ' 个词条，忽略 ' +
+        result.invalid.length + ' 个无效词条。',
+        'error'
+      );
+      return;
+    }
+
+    if (result.added.length > 1) {
+      setTagInputStatus('已批量添加 ' + result.added.length + ' 个词条。', 'success');
+      return;
+    }
+
+    if (!result.added.length && result.duplicates.length) {
+      setTagInputStatus('这些词条已经添加过了。', '');
+      return;
+    }
+
+    setTagInputStatus('', '');
+  }
+
+  /**
+   * Add one or more target-word entries.
+   * Commas, semicolons, line breaks, and tabs separate entries.
+   * Spaces inside a phrase are preserved.
+   */
+  function addWords(raw, shouldFocus) {
+    var result = window.IELTSWordParser.parse(raw, words);
+    if (result.added.length) {
+      Array.prototype.push.apply(words, result.added);
+      renderTags();
+    }
     tagInput.value = '';
-    tagInput.focus();
+    reportWordResult(result);
+    if (shouldFocus !== false) tagInput.focus();
+    return result;
   }
 
   /**
@@ -90,41 +128,12 @@
     }
   }
 
-  function renderGenerationError(container, error) {
-    clearElement(container);
-
-    var panel = document.createElement('div');
-    panel.style.color = 'var(--color-error)';
-    panel.style.textAlign = 'center';
-    panel.style.padding = 'var(--space-6)';
-
-    var heading = document.createElement('p');
-    heading.style.fontWeight = 'var(--font-semibold)';
-    heading.style.marginBottom = 'var(--space-2)';
-    heading.textContent = '⚠️ 生成失败';
-
-    var message = document.createElement('p');
-    message.style.fontSize = 'var(--text-sm)';
-    message.style.color = 'var(--color-text-secondary)';
-    message.textContent = error && error.message ? error.message : '生成过程中发生未知错误。';
-
-    var hint = document.createElement('p');
-    hint.style.fontSize = 'var(--text-xs)';
-    hint.style.color = 'var(--color-text-muted)';
-    hint.style.marginTop = 'var(--space-3)';
-    hint.textContent = '请检查网络连接后重试，或联系管理员检查 AI 服务配置。';
-
-    panel.appendChild(heading);
-    panel.appendChild(message);
-    panel.appendChild(hint);
-    container.appendChild(panel);
-  }
-
   /* ── Event: typing in the input ── */
   tagInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter' || e.key === ',' || e.key === '，' ||
+        e.key === ';' || e.key === '；') {
       e.preventDefault();
-      addWord(tagInput.value.replace(',', ''));
+      addWords(tagInput.value);
       return;
     }
 
@@ -137,7 +146,25 @@
   // Also add on blur (treat leaving the input as "commit")
   tagInput.addEventListener('blur', function () {
     if (tagInput.value.trim()) {
-      addWord(tagInput.value);
+      addWords(tagInput.value, false);
+    }
+  });
+
+  tagInput.addEventListener('paste', function (e) {
+    var pasted = e.clipboardData && e.clipboardData.getData('text');
+    if (!pasted || !window.IELTSWordParser.hasSeparator(pasted)) return;
+
+    e.preventDefault();
+    var combined = tagInput.value
+      ? tagInput.value + '\n' + pasted
+      : pasted;
+    addWords(combined);
+  });
+
+  // Handles punctuation entered through mobile keyboards or input methods.
+  tagInput.addEventListener('input', function () {
+    if (window.IELTSWordParser.hasSeparator(tagInput.value)) {
+      addWords(tagInput.value);
     }
   });
 
@@ -157,7 +184,7 @@
   });
 
   /* ========================================
-     Scene & Voice Selection — visual only
+     Section & Voice Selection — visual only
      (radio inputs handle state natively)
      ======================================== */
 
@@ -214,35 +241,39 @@
   updateSubmitState();
 
   submitBtn.addEventListener('click', function () {
-    if (words.length === 0) return;
+    if (words.length === 0 || submitBtn.classList.contains('loading')) return;
 
-    // Collect selected scene
-    var sceneInput = document.querySelector('input[name="scene"]:checked');
-    var scene = sceneInput ? sceneInput.value : null;
+    // Collect selected IELTS section
+    var sectionInput = document.querySelector('input[name="section"]:checked');
+    var section = sectionInput ? sectionInput.value : 'section-1';
 
-    // Collect selected voices (multi-select)
-    var voiceInputs = document.querySelectorAll('input[name="voice"]:checked');
-    var voices = Array.from(voiceInputs).map(function (el) { return el.value; });
-    if (voices.length === 0) voices = ['british-female'];
+    // Collect the selected voice
+    var voiceInput = document.querySelector('input[name="voice"]:checked');
+    var voice = voiceInput ? voiceInput.value : 'british-female';
+    var voices = [voice];
 
     // Show loading state
     submitBtn.classList.add('loading');
+    submitBtn.disabled = true;
+    setTagInputStatus('', '');
 
     // Call AI Service to generate passage
     window.AIService.generatePassage({
       words: words.slice(),
-      scene: scene,
+      section: section,
       voices: voices,
       difficulty: 'medium',
     })
       .then(function (result) {
         submitBtn.classList.remove('loading');
+        updateSubmitState();
+        setTagInputStatus('', '');
 
         // Dispatch custom event with the result
         var event = new CustomEvent('generator:submit', {
           detail: {
             words: result.targetWords || words.slice(),
-            scene: scene,
+            section: section,
             voices: voices,
             passage: result.passage,
             title: result.title,
@@ -254,18 +285,12 @@
       })
       .catch(function (error) {
         submitBtn.classList.remove('loading');
+        updateSubmitState();
         console.error('[Generator] AI generation failed:', error);
 
-        // Show error feedback to user
-        var resultSection = document.getElementById('resultSection');
-        if (resultSection) {
-          resultSection.classList.add('visible');
-          var transcriptText = document.getElementById('transcriptText');
-          if (transcriptText) {
-            renderGenerationError(transcriptText, error);
-          }
-          resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        // Keep any previous successful result visible and avoid exposing
+        // provider/validation details in the transcript area.
+        setTagInputStatus('本次暂未生成成功，请再次点击 Generate。', 'error');
       });
   });
 
@@ -274,7 +299,7 @@
      ======================================== */
 
   // Passage generation: see js/services/mockProvider.js and js/services/apiProvider.js.
-  // Lookup tables: use window.PromptBuilder.getVoiceMeta() / getSceneLabel().
+  // Lookup tables: use window.PromptBuilder.getVoiceMeta() / getSectionLabel().
 
   function buildHighlightRegex(words) {
     var patterns = words
@@ -391,17 +416,28 @@
       resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // Initialize player with demo audio (primary voice)
-    initDemoPlayer(voices[0]);
+    // Generate and load real speech audio.
+    initSpeechPlayer(rawPassage, voices[0]);
   });
 
-  function initDemoPlayer(voice) {
+  function setAudioStatus(message, isError) {
+    var status = document.getElementById('audioStatus');
+    if (!status) return;
+    status.textContent = message || '';
+    status.classList.toggle('is-error', Boolean(isError));
+  }
+
+  function initSpeechPlayer(text, voice) {
     var container = document.getElementById('audioPlayer');
     if (!container) return;
 
     // Destroy previous player instance if exists
     if (window._activePlayer) {
       window._activePlayer.destroy();
+    }
+    if (activeAudioUrl) {
+      URL.revokeObjectURL(activeAudioUrl);
+      activeAudioUrl = '';
     }
 
     var meta = window.PromptBuilder
@@ -413,108 +449,24 @@
       voiceLabel: meta.label,
     });
 
-    // Generate a demo audio tone via Web Audio API
-    generateDemoTone(function (blobUrl) {
-      player.load(blobUrl);
-    });
-
     window._activePlayer = player;
-  }
+    setAudioStatus('正在生成语音…', false);
 
-  /**
-   * Generate a simple demo audio tone.
-   * This is a placeholder until real TTS audio is available.
-   */
-  function generateDemoTone(callback) {
-    try {
-      var AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) {
-        console.warn('Web Audio API not available');
-        callback('');
-        return;
-      }
-
-      var ctx = new AudioContext();
-      var sampleRate = ctx.sampleRate;
-      var duration = 4; // seconds
-      var length = sampleRate * duration;
-      var buffer = ctx.createBuffer(1, length, sampleRate);
-      var data = buffer.getChannelData(0);
-
-      // Generate a simple melody-like tone
-      var notes = [261.63, 293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66];
-      var noteLength = length / notes.length;
-
-      for (var i = 0; i < length; i++) {
-        var noteIdx = Math.floor(i / noteLength);
-        var freq = notes[Math.min(noteIdx, notes.length - 1)];
-        var t = i / sampleRate;
-        var envelope = Math.max(0, 1 - (i / length) * 0.7);
-
-        // Mix sine wave with a bit of harmonics for a warmer tone
-        var sample = Math.sin(2 * Math.PI * freq * t) * 0.6 +
-                     Math.sin(2 * Math.PI * freq * 2 * t) * 0.2 +
-                     Math.sin(2 * Math.PI * freq * 3 * t) * 0.1;
-        data[i] = sample * envelope * 0.5;
-      }
-
-      // Convert to WAV blob
-      var wav = encodeWAV(buffer);
-      var blob = new Blob([wav], { type: 'audio/wav' });
-      var url = URL.createObjectURL(blob);
-      callback(url);
-    } catch (err) {
-      console.warn('Failed to generate demo tone:', err);
-      callback('');
-    }
-  }
-
-  /**
-   * Encode AudioBuffer as WAV.
-   */
-  function encodeWAV(audioBuffer) {
-    var numChannels = audioBuffer.numberOfChannels;
-    var sampleRate = audioBuffer.sampleRate;
-    var format = 1; // PCM
-    var bitsPerSample = 16;
-    var data = audioBuffer.getChannelData(0);
-    var byteRate = sampleRate * numChannels * bitsPerSample / 8;
-    var blockAlign = numChannels * bitsPerSample / 8;
-    var dataLength = data.length * numChannels * bitsPerSample / 8;
-    var buffer = new ArrayBuffer(44 + dataLength);
-    var view = new DataView(buffer);
-
-    // WAV header
-    writeString(view, 0, 'RIFF');
-    view.setUint32(4, 36 + dataLength, true);
-    writeString(view, 8, 'WAVE');
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, format, true);
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, byteRate, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitsPerSample, true);
-    writeString(view, 36, 'data');
-    view.setUint32(40, dataLength, true);
-
-    // Write samples
-    var offset = 44;
-    for (var i = 0; i < data.length; i++) {
-      var sample = Math.max(-1, Math.min(1, data[i]));
-      sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-      view.setInt16(offset, sample, true);
-      offset += 2;
-    }
-
-    return buffer;
-  }
-
-  function writeString(view, offset, string) {
-    for (var i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
+    window.SpeechService.generate(text, voice)
+      .then(function (audioBlob) {
+        if (window._activePlayer !== player) return;
+        activeAudioUrl = URL.createObjectURL(audioBlob);
+        player.load(activeAudioUrl);
+        setAudioStatus('语音已生成，可以开始播放。', false);
+      })
+      .catch(function (error) {
+        if (window._activePlayer !== player) return;
+        console.error('[Generator] Speech generation failed:', error);
+        setAudioStatus(
+          error && error.message ? error.message : '语音生成失败，请稍后重试。',
+          true
+        );
+      });
   }
 
   /* ========================================
@@ -523,18 +475,20 @@
 
   window.IELTSGenerator = {
     getWords: function () { return words.slice(); },
-    getSelectedScene: function () {
-      var el = document.querySelector('input[name="scene"]:checked');
+    getSelectedSection: function () {
+      var el = document.querySelector('input[name="section"]:checked');
       return el ? el.value : null;
     },
     getSelectedVoices: function () {
-      var els = document.querySelectorAll('input[name="voice"]:checked');
-      return Array.from(els).map(function (el) { return el.value; });
+      var el = document.querySelector('input[name="voice"]:checked');
+      return [el ? el.value : 'british-female'];
     },
-    addWord: addWord,
+    addWord: function (raw) { return addWords(raw); },
+    addWords: addWords,
     clearWords: function () {
       words.length = 0;
       renderTags();
+      setTagInputStatus('', '');
     },
     setLoading: function (loading) {
       if (loading) {

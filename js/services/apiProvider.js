@@ -24,7 +24,7 @@
    *
    * @param {Object} p
    * @param {string[]} p.words      - target vocabulary
-   * @param {string}   p.scene      - scene key
+   * @param {string}   p.section    - IELTS section key
    * @param {string[]} p.voices     - voice keys
    * @param {string}   p.difficulty - 'easy' | 'medium' | 'hard'
    * @returns {Promise<Object>}
@@ -37,7 +37,7 @@
       },
       body: JSON.stringify({
         words:      p.words || [],
-        scene:      p.scene || 'academic-lecture',
+        section:    p.section || 'section-1',
         voices:     p.voices && p.voices.length ? p.voices : ['british-female'],
         difficulty: p.difficulty || 'medium',
       }),

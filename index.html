@@ -20,7 +20,6 @@
   <link rel="stylesheet" href="css/player.css">
   <link rel="stylesheet" href="css/result.css">
   <link rel="stylesheet" href="css/how-it-works.css">
-  <link rel="stylesheet" href="css/modules.css">
   <link rel="stylesheet" href="css/footer.css">
 </head>
 <body>
@@ -37,7 +36,6 @@
     <div class="navbar__links">
       <a href="#generator" class="navbar__link">AI 听力</a>
       <a href="#how-it-works" class="navbar__link">学习流程</a>
-      <a href="#modules" class="navbar__link">全能雅思</a>
     </div>
 
     <a href="#" class="navbar__cta">登录</a>
@@ -132,46 +130,49 @@
             type="text"
             class="tag-input"
             id="tagInput"
-            placeholder="输入单词后按回车添加，如：environment, economy, sustainable..."
+            placeholder="输入词条后按回车，或粘贴逗号、分号、换行分隔的词表"
             aria-label="输入单词"
           >
         </div>
-        <p class="tag-input-hint">💡 输入单词后按 <strong>回车</strong> 添加 · 支持一次添加多个</p>
+        <p class="tag-input-hint">
+          💡 支持逗号、分号、换行批量添加 · 普通空格会保留在短语中 · 最多 20 个词条
+        </p>
+        <p class="tag-input-status" id="tagInputStatus" role="status" aria-live="polite"></p>
       </div>
 
       <div class="generator__divider" aria-hidden="true"></div>
 
-      <!-- ===== Step 2: Scene Selection ===== -->
+      <!-- ===== Step 2: IELTS Section Selection ===== -->
       <div class="generator__step">
         <span class="generator__step-label">Step 2</span>
-        <h3 class="generator__step-title">🎯 选择场景</h3>
+        <h3 class="generator__step-title">🎯 选择 IELTS Listening Section</h3>
         <div class="scene-cards">
           <div class="scene-card">
-            <input type="radio" name="scene" id="scene-academic" value="academic-lecture" class="scene-card__input" checked>
-            <label for="scene-academic" class="scene-card__label">
-              <span class="scene-card__icon">🏛️</span>
-              <span class="scene-card__name">Academic<br>Lecture</span>
+            <input type="radio" name="section" id="section-1" value="section-1" class="scene-card__input" checked>
+            <label for="section-1" class="scene-card__label">
+              <span class="scene-card__icon">📞</span>
+              <span class="scene-card__name">Section 1<br>Everyday Conversation</span>
             </label>
           </div>
           <div class="scene-card">
-            <input type="radio" name="scene" id="scene-campus" value="campus-conversation" class="scene-card__input">
-            <label for="scene-campus" class="scene-card__label">
+            <input type="radio" name="section" id="section-2" value="section-2" class="scene-card__input">
+            <label for="section-2" class="scene-card__label">
+              <span class="scene-card__icon">🗺️</span>
+              <span class="scene-card__name">Section 2<br>Social Monologue</span>
+            </label>
+          </div>
+          <div class="scene-card">
+            <input type="radio" name="section" id="section-3" value="section-3" class="scene-card__input">
+            <label for="section-3" class="scene-card__label">
               <span class="scene-card__icon">🎓</span>
-              <span class="scene-card__name">Campus<br>Conversation</span>
+              <span class="scene-card__name">Section 3<br>Academic Discussion</span>
             </label>
           </div>
           <div class="scene-card">
-            <input type="radio" name="scene" id="scene-daily" value="daily-life" class="scene-card__input">
-            <label for="scene-daily" class="scene-card__label">
-              <span class="scene-card__icon">☕</span>
-              <span class="scene-card__name">Daily<br>Life</span>
-            </label>
-          </div>
-          <div class="scene-card">
-            <input type="radio" name="scene" id="scene-environment" value="environment-nature" class="scene-card__input">
-            <label for="scene-environment" class="scene-card__label">
-              <span class="scene-card__icon">🌿</span>
-              <span class="scene-card__name">Environment<br>&amp; Nature</span>
+            <input type="radio" name="section" id="section-4" value="section-4" class="scene-card__input">
+            <label for="section-4" class="scene-card__label">
+              <span class="scene-card__icon">🏛️</span>
+              <span class="scene-card__name">Section 4<br>Academic Lecture</span>
             </label>
           </div>
         </div>
@@ -185,7 +186,7 @@
         <h3 class="generator__step-title">🎤 选择声音</h3>
         <div class="voice-cards">
           <div class="voice-card">
-            <input type="checkbox" name="voice" id="voice-british-female" value="british-female" class="voice-card__input" checked>
+            <input type="radio" name="voice" id="voice-british-female" value="british-female" class="voice-card__input" checked>
             <label for="voice-british-female" class="voice-card__label">
               <span class="voice-card__flag">🇬🇧</span>
               <span class="voice-card__info">
@@ -196,7 +197,7 @@
             </label>
           </div>
           <div class="voice-card">
-            <input type="checkbox" name="voice" id="voice-british-male" value="british-male" class="voice-card__input">
+            <input type="radio" name="voice" id="voice-british-male" value="british-male" class="voice-card__input">
             <label for="voice-british-male" class="voice-card__label">
               <span class="voice-card__flag">🇬🇧</span>
               <span class="voice-card__info">
@@ -207,7 +208,7 @@
             </label>
           </div>
           <div class="voice-card">
-            <input type="checkbox" name="voice" id="voice-australian-female" value="australian-female" class="voice-card__input">
+            <input type="radio" name="voice" id="voice-australian-female" value="australian-female" class="voice-card__input">
             <label for="voice-australian-female" class="voice-card__label">
               <span class="voice-card__flag">🇦🇺</span>
               <span class="voice-card__info">
@@ -218,7 +219,7 @@
             </label>
           </div>
           <div class="voice-card">
-            <input type="checkbox" name="voice" id="voice-american-female" value="american-female" class="voice-card__input">
+            <input type="radio" name="voice" id="voice-american-female" value="american-female" class="voice-card__input">
             <label for="voice-american-female" class="voice-card__label">
               <span class="voice-card__flag">🇺🇸</span>
               <span class="voice-card__info">
@@ -278,6 +279,7 @@
           <span class="audio-player__voice-flag">🇬🇧</span>
           <span class="audio-player__voice-label">British Female</span>
         </div>
+        <div class="audio-player__status" id="audioStatus" role="status" aria-live="polite"></div>
 
         <!-- Main controls -->
         <div class="audio-player__controls">
@@ -417,53 +419,6 @@
   </section>
 
   <!-- ========================================
-       IELTS MODULES — 4-skill overview
-       ======================================== -->
-  <section id="modules" class="modules" aria-labelledby="modules-title">
-    <div class="modules__header">
-      <h2 id="modules-title" class="modules__title">🎯 全能雅思学习</h2>
-      <p class="modules__subtitle">一个平台，覆盖听说读写四项核心技能</p>
-    </div>
-
-    <div class="modules__grid">
-      <!-- Listening — Active -->
-      <a href="#generator" class="module-card module-card--active">
-        <span class="module-card__icon">🎧</span>
-        <h3 class="module-card__title">Listening</h3>
-        <p class="module-card__desc">AI 生成真实场景听力材料，支持多种口音选择</p>
-        <span class="module-card__badge">
-          <span class="module-card__badge-dot" aria-hidden="true"></span>
-          已上线
-        </span>
-      </a>
-
-      <!-- Writing — Coming Soon -->
-      <div class="module-card module-card--soon">
-        <span class="module-card__icon">📝</span>
-        <h3 class="module-card__title">Writing</h3>
-        <p class="module-card__desc">AI 按官方四项评分标准批改作文，逐句精析</p>
-        <span class="module-card__badge">🚧 Coming Soon</span>
-      </div>
-
-      <!-- Reading — Coming Soon -->
-      <div class="module-card module-card--soon">
-        <span class="module-card__icon">📖</span>
-        <h3 class="module-card__title">Reading</h3>
-        <p class="module-card__desc">自适应难度 + 错题归因分析，精准定位薄弱环节</p>
-        <span class="module-card__badge">🚧 Coming Soon</span>
-      </div>
-
-      <!-- Speaking — Coming Soon -->
-      <div class="module-card module-card--soon">
-        <span class="module-card__icon">🎙️</span>
-        <h3 class="module-card__title">Speaking</h3>
-        <p class="module-card__desc">AI 语音对话模拟真实考官，24 小时随时练习</p>
-        <span class="module-card__badge">🚧 Coming Soon</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========================================
        FOOTER
        ======================================== -->
   <footer class="footer">
@@ -478,7 +433,6 @@
       <div class="footer__links">
         <a href="#generator" class="footer__link">AI 听力</a>
         <a href="#how-it-works" class="footer__link">学习流程</a>
-        <a href="#modules" class="footer__link">全能雅思</a>
       </div>
 
       <!-- Copyright -->
@@ -494,6 +448,8 @@
   <script src="js/services/mockProvider.js"></script>
   <script src="js/services/apiProvider.js"></script>
   <script src="js/services/aiService.js"></script>
+  <script src="js/services/speechService.js"></script>
+  <script src="js/services/wordParser.js"></script>
   <!-- Scripts: App Logic -->
   <script src="js/generator.js"></script>
   <script src="js/player.js"></script>

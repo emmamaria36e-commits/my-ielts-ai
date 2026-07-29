@@ -3,19 +3,27 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const http = require('node:http');
 const path = require('node:path');
 const vm = require('node:vm');
+const wordParser = require('../js/services/wordParser');
+const { buildPrompt } = require('../server/promptBuilder');
 
 const {
+  buildSpeechSsml,
   containsTargetWord,
+  escapeXml,
   parseModelContent,
+  requestPassage,
+  stripSpeakerLabels,
   validateGenerateRequest,
   validateModelResult,
+  validateSpeechRequest,
 } = require('../server');
 
 const params = {
   words: ['environment', 'sustainable development'],
-  scene: 'academic-lecture',
+  section: 'section-4',
   voices: ['british-female'],
   difficulty: 'medium',
 };
@@ -43,11 +51,40 @@ function loadMockProvider() {
 test('request validation normalizes target-word whitespace', () => {
   const result = validateGenerateRequest({
     words: ['  Sustainable   Development  '],
-    scene: 'academic-lecture',
+    section: 'section-4',
     voices: ['british-female'],
     difficulty: 'medium',
   });
   assert.deepEqual(result.words, ['sustainable development']);
+  assert.equal(result.section, 'section-4');
+});
+
+test('request validation accepts only IELTS Listening Section 1–4', () => {
+  assert.equal(validateGenerateRequest({
+    words: ['environment'],
+    section: 'section-1',
+    voices: ['british-female'],
+    difficulty: 'medium',
+  }).section, 'section-1');
+
+  assert.throws(() => validateGenerateRequest({
+    words: ['environment'],
+    section: 'academic-lecture',
+    voices: ['british-female'],
+    difficulty: 'medium',
+  }), /Unsupported IELTS Listening section/);
+});
+
+test('prompt uses Section for content structure and Voice only for playback', () => {
+  const sectionOne = buildPrompt({ ...params, section: 'section-1' });
+  const sectionFour = buildPrompt({ ...params, section: 'section-4' });
+
+  assert.match(sectionOne.system, /two-person conversation/i);
+  assert.match(sectionOne.system, /Speaker A or Speaker B/);
+  assert.match(sectionFour.system, /academic monologue/i);
+  assert.match(sectionFour.system, /one speaker/i);
+  assert.match(sectionOne.system, /Voice is playback metadata only/i);
+  assert.match(sectionOne.system, /must be 160-220 words/);
 });
 
 test('strict JSON parser accepts JSON and rejects surrounding text', () => {
@@ -92,8 +129,72 @@ test('every target word or phrase must be present', () => {
       { title: 'Title', passage: 'This passage discusses the environment in enough detail for a listening exercise.' },
       params
     ),
-    /every target word/
+    function (error) {
+      assert.match(error.message, /every target word/);
+      assert.deepEqual(error.missingWords, ['sustainable development']);
+      assert.equal(error.repairDraft.title, 'Title');
+      return true;
+    }
   );
+});
+
+test('missing target words trigger one focused repair of the previous draft', async () => {
+  const requests = [];
+  const upstream = http.createServer((request, response) => {
+    let body = '';
+    request.setEncoding('utf8');
+    request.on('data', (chunk) => { body += chunk; });
+    request.on('end', () => {
+      requests.push(JSON.parse(body));
+      const modelResult = requests.length === 1
+        ? {
+            title: 'Urban Environment',
+            passage: 'This listening passage discusses the environment in enough detail for a useful practice exercise.',
+          }
+        : { title: 'Urban Futures', passage: validPassage };
+      const payload = {
+        choices: [{ message: { content: JSON.stringify(modelResult) } }],
+      };
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify(payload));
+    });
+  });
+
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  const address = upstream.address();
+  const previous = {
+    key: process.env.AI_API_KEY,
+    endpoint: process.env.AI_API_ENDPOINT,
+    model: process.env.AI_MODEL,
+    provider: process.env.AI_PROVIDER,
+  };
+
+  process.env.AI_API_KEY = 'test-key';
+  process.env.AI_API_ENDPOINT = `http://127.0.0.1:${address.port}/chat/completions`;
+  process.env.AI_MODEL = 'test-model';
+  process.env.AI_PROVIDER = 'test-provider';
+
+  try {
+    const result = await requestPassage(params);
+    assert.equal(requests.length, 2);
+    assert.equal(result.metadata.attempts, 2);
+    assert.equal(result.metadata.repaired, true);
+    assert.match(requests[1].messages[1].content, /Missing target words: \["sustainable development"\]/);
+    assert.match(requests[1].messages[1].content, /Previous draft:/);
+    assert.equal(result.passage, validPassage);
+  } finally {
+    await new Promise((resolve) => upstream.close(resolve));
+    Object.entries(previous).forEach(([name, value]) => {
+      const envName = {
+        key: 'AI_API_KEY',
+        endpoint: 'AI_API_ENDPOINT',
+        model: 'AI_MODEL',
+        provider: 'AI_PROVIDER',
+      }[name];
+      if (value === undefined) delete process.env[envName];
+      else process.env[envName] = value;
+    });
+  }
 });
 
 test('target matching is case-insensitive and respects word boundaries', () => {
@@ -111,13 +212,13 @@ test('frontend transcript rendering does not assign model content to innerHTML',
   assert.match(source, /highlight\.textContent = match\[0\]/);
 });
 
-test('Mock Provider satisfies the real passage contract for every scene and word count', async () => {
+test('Mock Provider satisfies the real passage contract for every section and word count', async () => {
   const mockProvider = loadMockProvider();
-  const scenes = [
-    'academic-lecture',
-    'campus-conversation',
-    'daily-life',
-    'environment-nature',
+  const sections = [
+    'section-1',
+    'section-2',
+    'section-3',
+    'section-4',
   ];
   const vocabulary = [
     'environment', 'economy', 'sustainable development', 'research', 'community',
@@ -127,12 +228,12 @@ test('Mock Provider satisfies the real passage contract for every scene and word
   ];
   const wordCounts = [1, 3, 10, 20];
 
-  for (const scene of scenes) {
+  for (const section of sections) {
     for (const count of wordCounts) {
       const words = vocabulary.slice(0, count);
       const result = await mockProvider.generate({
         words,
-        scene,
+        section,
         voices: ['british-female'],
         difficulty: 'medium',
       });
@@ -151,7 +252,7 @@ test('Mock Provider normalizes duplicate words and preserves supported punctuati
   const mockProvider = loadMockProvider();
   const result = await mockProvider.generate({
     words: [' Environment ', 'environment', 'sustainable   development', 'long-term', "learner's"],
-    scene: 'academic-lecture',
+    section: 'section-4',
     voices: ['british-female'],
     difficulty: 'medium',
   });
@@ -167,7 +268,7 @@ test('Mock Provider normalizes duplicate words and preserves supported punctuati
 test('Mock Provider rejects invalid target-word input', async () => {
   const mockProvider = loadMockProvider();
   const base = {
-    scene: 'academic-lecture',
+    section: 'section-4',
     voices: ['british-female'],
     difficulty: 'medium',
   };
@@ -175,4 +276,126 @@ test('Mock Provider rejects invalid target-word input', async () => {
   await assert.rejects(mockProvider.generate({ ...base, words: [] }), /between 1 and 20/);
   await assert.rejects(mockProvider.generate({ ...base, words: new Array(21).fill('environment') }), /between 1 and 20/);
   await assert.rejects(mockProvider.generate({ ...base, words: ['<script>'] }), /Invalid target word/);
+});
+
+test('speech request accepts validated text and a supported voice', () => {
+  const result = validateSpeechRequest({
+    text: validPassage,
+    voice: 'british-female',
+  });
+
+  assert.deepEqual(result, {
+    text: validPassage,
+    voice: 'british-female',
+  });
+});
+
+test('speech request rejects unsupported voices and HTML', () => {
+  assert.throws(
+    () => validateSpeechRequest({ text: validPassage, voice: 'custom-voice' }),
+    /Unsupported speech voice/
+  );
+  assert.throws(
+    () => validateSpeechRequest({ text: `${validPassage}<break/>`, voice: 'british-female' }),
+    /must not contain HTML/
+  );
+});
+
+test('speech SSML escapes untrusted text and uses the trusted voice mapping', () => {
+  const text = `Research & development use "evidence" and learners' feedback.`;
+  const ssml = buildSpeechSsml({
+    text,
+    voice: 'british-female',
+  });
+
+  assert.match(ssml, /name="en-GB-SoniaNeural"/);
+  assert.match(ssml, /Research &amp; development/);
+  assert.match(ssml, /&quot;evidence&quot;/);
+  assert.match(ssml, /learners&apos; feedback/);
+  assert.doesNotMatch(ssml, /Research & development/);
+  assert.equal(
+    escapeXml('<script>"unsafe" & text</script>'),
+    '&lt;script&gt;&quot;unsafe&quot; &amp; text&lt;/script&gt;'
+  );
+});
+
+test('speech removes trusted dialogue labels without changing transcript text', () => {
+  const passage = [
+    'Speaker A: Could I make a booking?',
+    'Speaker B: Yes, the room is available.',
+    'The phrase Speaker A remains when it is not a line label.',
+  ].join('\n');
+  const cleaned = stripSpeakerLabels(passage);
+  const ssml = buildSpeechSsml({ text: passage, voice: 'british-female' });
+
+  assert.equal(cleaned, [
+    'Could I make a booking?',
+    'Yes, the room is available.',
+    'The phrase Speaker A remains when it is not a line label.',
+  ].join('\n'));
+  assert.doesNotMatch(ssml, /Speaker A:/);
+  assert.doesNotMatch(ssml, /Speaker B:/);
+  assert.match(ssml, /The phrase Speaker A remains/);
+});
+
+test('generate button is disabled while an AI request is in progress', () => {
+  const generatorPath = path.join(__dirname, '..', 'js', 'generator.js');
+  const source = fs.readFileSync(generatorPath, 'utf8');
+  assert.match(source, /submitBtn\.disabled = true/);
+  assert.match(source, /classList\.contains\('loading'\)/);
+});
+
+test('terminal AI errors stay out of the transcript result area', () => {
+  const generatorPath = path.join(__dirname, '..', 'js', 'generator.js');
+  const source = fs.readFileSync(generatorPath, 'utf8');
+  const catchBlock = source.slice(
+    source.indexOf('.catch(function (error)', source.indexOf('AIService.generatePassage')),
+    source.indexOf('/* ========================================', source.indexOf('AIService.generatePassage'))
+  );
+
+  assert.match(catchBlock, /本次暂未生成成功/);
+  assert.doesNotMatch(catchBlock, /renderGenerationError/);
+});
+
+test('word parser splits common list delimiters and preserves phrases', () => {
+  const result = wordParser.parse(
+    'Environment, sustainable development；climate change\nrenewable energy\tbiodiversity',
+    []
+  );
+
+  assert.deepEqual(result.added, [
+    'environment',
+    'sustainable development',
+    'climate change',
+    'renewable energy',
+    'biodiversity',
+  ]);
+  assert.deepEqual(result.invalid, []);
+  assert.deepEqual(result.overflow, []);
+});
+
+test('word parser normalizes whitespace and removes duplicates', () => {
+  const result = wordParser.parse(
+    '  Sustainable   Development  , ecosystem, ECOSYSTEM, long-term, learner\'s ',
+    ['sustainable development']
+  );
+
+  assert.deepEqual(result.added, ['ecosystem', 'long-term', "learner's"]);
+  assert.deepEqual(result.duplicates, ['sustainable development', 'ecosystem']);
+});
+
+test('word parser rejects invalid entries and enforces the 20-word limit', () => {
+  const existing = Array.from({ length: 19 }, function (_, index) {
+    return 'word ' + String.fromCharCode(97 + index);
+  });
+  const result = wordParser.parse('valid word, another word, <script>', existing);
+
+  assert.deepEqual(result.added, ['valid word']);
+  assert.deepEqual(result.overflow, ['another word']);
+  assert.deepEqual(result.invalid, ['<script>']);
+});
+
+test('word parser does not split ordinary spaces inside an entry', () => {
+  const result = wordParser.parse('renewable energy transition', []);
+  assert.deepEqual(result.added, ['renewable energy transition']);
 });

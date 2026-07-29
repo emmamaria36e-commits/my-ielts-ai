@@ -174,8 +174,23 @@
   margin-top: var(--space-2);
 }
 
+.tag-input-status {
+  min-height: 1.25rem;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.tag-input-status.is-success {
+  color: var(--color-success);
+}
+
+.tag-input-status.is-error {
+  color: var(--color-error);
+}
+
 /* ========================================
-   Step 2 — Scene Selection Cards
+   Step 2 — Section Selection Cards
    ======================================== */
 
 .scene-cards {

@@ -49,4 +49,34 @@
 - **Product limitation:** Vocabulary Focus 只保证目标词真实出现，不代表 Mock 能理解任意词义或达到真实 AI 的写作质量。
 - **Related bug:** [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
 
+## DEV-005 — 接入单声音 Azure Speech
+
+- **Date:** 2026-07-29
+- **Milestone:** P0 Step 4
+- **Objective:** 用真实语音替换 Web Audio 提示音，并保持 Speech 密钥只存在于 Node 服务端。
+- **Implementation:** 新增同源 `/api/speech`；服务端验证正文和单声音白名单、转义 XML、构造 SSML并调用 Azure Speech REST API；前端新增轻量 Speech Service，将返回的 MP3 交给现有播放器。
+- **Scope:** Voice 选择收敛为单选；一篇正文生成一条 MP3；未实现多角色切换、音频拼接、缓存、持久化和时间轴。
+- **Automated validation:** JavaScript 语法检查通过；14 条测试通过，其中新增 Speech 输入、声音白名单、HTML 拒绝和 SSML 转义覆盖。
+- **External validation:** 使用已配置的 Azure Speech 资源完成真实请求，`/api/speech` 返回 HTTP 200、`audio/mpeg` 和非空 MP3 数据。
+- **Security result:** Key 和 Region 只从服务端 `.env` 读取；浏览器不接触 Azure 凭据、区域或上游地址。
+- **Related decision:** [DEC-003](DECISION_LOG.md#dec-003--使用服务端-azure-speech-rest-api-生成单声音音频)。
+
+## DEV-006 — 按 IELTS Listening Section 生成正文
+
+- **Date:** 2026-07-29
+- **Milestone:** P0 Step 5
+- **Objective:** 用 Section 1–4 替换混合 Scene 分类，让正文结构更贴近 IELTS Listening，同时保持单声音 TTS 和 MVP 范围。
+- **Implementation:** 页面改为选择 Section 1–4；前后端请求字段统一为 `section`；服务端 Prompt 为四个 Section 分别定义对话或独白格式、语境、信息组织和典型听力特征；Voice 明确只作为播放元数据。
+- **Scope:** 未加入题目、答案、题型策略、多角色 TTS、音频拼接或自动质量重试。
+- **Validation:** Section 输入白名单、Section Prompt 结构、四种 Mock 契约以及既有模型、Speech 和批量词条测试全部通过。使用已配置的 DeepSeek 分别完成四种 Section 的真实生成：Section 1、3 返回带说话人标签的对话，Section 2、4 返回无说话人标签的独白；四篇均带正确 Section 元数据并包含全部目标词。
+- **Related decision:** [DEC-004](DECISION_LOG.md#dec-004--以-ielts-listening-section-1-4-决定文本结构)。
+
+## DEV-007 — 降低生成与语音的可恢复失败率
+
+- **Date:** 2026-07-29
+- **Objective:** 减少偶发模型格式错误、重复点击、共享限流和 Speech 临时超时导致的失败，并避免朗读角色标签。
+- **Implementation:** Generate 进行中禁用按钮；DeepSeek 缺词时把实际缺失词和上一版草稿送入一次定向修订，其他 502 类供应商或结果校验失败最多重新生成一次，第二次降低随机度；两次仍失败时只在输入区显示简短中文提示，不覆盖听力原文；AI 与 Speech 分开限流；Azure Speech 对临时失败或超时最多重试一次；构造 SSML 前移除行首 `Speaker A/B/C:`，页面原文保持不变。
+- **Scope:** 未加入无限重试、后台任务、多角色 TTS、音频拼接或宽松模型结果校验。
+- **Validation:** 24 项自动测试通过，覆盖定向修订携带缺失词和上一版草稿、按钮防重复提交、终态错误不进入原文区及 Speech 标签清理；真实 DeepSeek 使用 12 个目标词生成成功并包含全部词；真实 Azure Speech 返回非空 MP3。验证期间实际观察到一次 Azure 超时，新增受控重试后再次请求成功。
+
 后续只在完成重要里程碑或开发阶段发生明显变化时新增记录。

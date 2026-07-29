@@ -7,7 +7,7 @@
 当前项目由没有构建步骤的单页前端和同仓库最小 Node 服务组成：
 
 ```text
-server.js                    静态资源和受保护的模型 API
+server.js                    静态资源、受保护的模型 API 和 Speech API
 server/promptBuilder.js      服务端可信 Prompt
 index.html
 ├─ css/                      页面模块样式
@@ -16,9 +16,10 @@ index.html
    ├─ player.js             自定义音频播放器
    └─ services/
       ├─ aiService.js       Provider 选择和统一入口
-      ├─ promptBuilder.js   Prompt 与显示元数据
-      ├─ mockProvider.js    确定性场景文本与词汇焦点
-      └─ apiProvider.js      同源 Node API 客户端
+      ├─ promptBuilder.js   Mock 调试 Prompt 与 Section/Voice 显示元数据
+      ├─ mockProvider.js    确定性 Section 测试文本
+      ├─ apiProvider.js      同源 Node 模型 API 客户端
+      └─ speechService.js    同源 Node Speech API 客户端
 ```
 
 ### Current Request Flow
@@ -29,7 +30,7 @@ index.html
 Browser
   → AIService
   → MockAIProvider validates and normalizes target words
-  → stable scene passage + scene-specific vocabulary focus
+  → stable Section passage + lightweight target-word sentence
   → result satisfies the real Provider contract
   → safe result display
 ```
@@ -39,10 +40,24 @@ Browser
 ```text
 Browser
   → APIProvider
-  → POST /api/generate with structured parameters
-  → Node validates input and builds the prompt
+  → POST /api/generate with words, Section, Voice and difficulty
+  → Node validates input and builds a Section-specific prompt
   → external model API with server-only credentials
+  → missing words trigger one focused revision of the previous draft; other recoverable failures trigger one fresh retry
   → Node returns the normalized result
+```
+
+生成正文后，单声音语音路径为：
+
+```text
+Browser
+  → SpeechService
+  → POST /api/speech with validated passage text and one trusted voice key
+  → Node validates text and maps the voice key to an Azure voice
+  → Azure Speech with server-only credentials and escaped SSML
+  → one controlled retry for a temporary provider failure or timeout
+  → Node returns MP3 audio
+  → existing player loads a temporary browser object URL
 ```
 
 浏览器不再保存密钥、上游地址或 Authorization Header。Node 只公开首页、`css/`、`js/`、`assets/` 和明确的 API 路由，不公开服务端文件或 `.env`。
@@ -50,16 +65,21 @@ Browser
 ## Completed P0 Foundation
 
 - 模型密钥、上游地址和 Prompt 已移到 Node 可信边界，见 [DEC-001](DECISION_LOG.md#dec-001--将模型调用迁移到最小-node-后端)。
-- `/api/generate` 对词汇数量、字符、场景、声音和难度执行服务端验证。
+- `/api/generate` 对词汇数量、字符、IELTS Listening Section、声音和难度执行服务端验证。
 - 上游请求设置超时，接口包含基础频率限制和受控错误响应。
 - 模型响应只接受严格 JSON、纯文本 title 和 passage，并验证长度、HTML 和全部目标词。
+- DeepSeek 缺词时保留上一版正文并定向修订实际缺失词；其他临时失败或结果校验失败最多重新生成一次。第二次使用更低随机度，不进行无限重试。
 - 页面使用文本节点和可信高亮元素展示正文，不将模型内容写入 `innerHTML`，见 [DEC-002](DECISION_LOG.md#dec-002--模型结果必须验证并以纯文本展示)。
-- Mock Provider 会验证输入，并确保全部目标词进入场景化 Vocabulary Focus；其输出通过与真实 Provider 相同的结果契约，见 [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
+- Mock Provider 会验证输入，并确保全部目标词进入轻量测试文本；其输出通过与真实 Provider 相同的结果契约，见 [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
+- `/api/speech` 使用服务端 Azure Speech 凭据，将受验证的正文合成为单声音 MP3；声音来自固定白名单，SSML 中的正文经过 XML 转义，见 [DEC-003](DECISION_LOG.md#dec-003--使用服务端-azure-speech-rest-api-生成单声音音频)。
+- AI 与 Speech 使用独立的基础频率限制；Speech 临时失败或超时时最多自动重试一次。
+- Section 1、3 的 `Speaker A/B/C:` 标签保留在页面原文中，但在构造 Speech SSML 前移除，避免被朗读。
+- Section 1–4 决定文本是对话还是独白及其内容组织；Voice 只决定 TTS 音色，见 [DEC-004](DECISION_LOG.md#dec-004--以-ielts-listening-section-1-4-决定文本结构)。
 
 ## Remaining P0 Risks
 
-1. 当前音频只是 Web Audio 提示音，没有实现 TTS。
-2. 首页展示范围大于当前 MVP，产品范围以 [PRODUCT.md](PRODUCT.md) 为准。
+1. 首页展示范围大于当前 MVP，产品范围以 [PRODUCT.md](PRODUCT.md) 为准。
+2. 当前语音为一次性实时生成，不包含缓存、持久化或失败重试。
 
 ## Current Validated Text Flow
 
@@ -77,26 +97,32 @@ Browser
 
 无效 JSON、错误字段、HTML、缺词或异常长度都会以失败响应终止，不能进入成功展示流程。
 
-## Next MVP Architecture Work — Planned
+如果两次尝试仍然失败，浏览器只在输入区显示可重试的简短中文提示，不将供应商或内部校验信息写入听力原文区域，也不覆盖已有成功结果。
 
-语音生成仍为计划：
+## Current Validated Speech Flow
+
+语音生成：
 
 ```text
 Browser
   → POST /api/speech with validated text and one voice
-  → Node backend
-  → TTS provider
-  → audio response
+  → Node validates text length, rejects HTML, and enforces a voice allowlist
+  → Node escapes the text and builds trusted SSML
+  → Azure Speech REST API
+  → MP3 audio response
+  → browser object URL
   → existing player controls
 ```
 
 ## Trust Boundaries
 
-- 浏览器不能持有模型或 TTS 密钥。模型密钥边界已经实现，TTS 尚未接入。
+- 浏览器不能持有模型或 TTS 密钥。两类密钥都只存在于服务端环境变量中。
 - 浏览器只发送业务参数，不能指定任意上游接口或系统 Prompt。该边界已经实现。
 - 用户输入、AI 输出和外部 API 响应均为不可信数据。
 - 模型返回的 JSON 必须经过结构和业务规则验证。真实 API 路径已经实现。
 - 展示层默认使用纯文本节点，不直接渲染模型 HTML。该边界已经实现。
+- 浏览器不能指定 Azure voice name、区域或上游地址，只能提交一个受支持的产品 voice key。
+- Speech 正文视为不可信数据；服务端拒绝 HTML，并在构造 SSML 前执行 XML 转义。
 - Mock 与真实 Provider 必须满足相同的成功结果契约。该契约已经通过自动测试统一验证。
 
 ## Intentionally Absent

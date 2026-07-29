@@ -18,7 +18,7 @@ My IELTS AI 帮助 IELTS 学习者把正在记忆的词汇转化为有语境、�
 
 ```text
 输入目标词汇
-→ 选择 IELTS 场景和单一声音
+→ 选择 IELTS Listening Section 1–4 和单一声音
 → AI 生成包含全部目标词的听力文本
 → TTS 生成与文本一致的真实语音
 → 播放音频并查看原文和目标词
@@ -27,7 +27,7 @@ My IELTS AI 帮助 IELTS 学习者把正在记忆的词汇转化为有语境、�
 ### In Scope
 
 - 目标词输入、去重和基础限制。
-- IELTS 听力场景选择。
+- IELTS Listening Section 1–4 选择；Section 决定文本结构和考点风格。
 - 单声音选择。
 - AI 听力文本生成。
 - 目标词完整性验证。
@@ -36,12 +36,16 @@ My IELTS AI 帮助 IELTS 学习者把正在记忆的词汇转化为有语境、�
 - 原文展示与目标词高亮。
 - 生成失败时提供清晰、可恢复的反馈。
 
+### Product Boundary
+
+- 产品只聚焦 IELTS Listening 工具，不计划扩展 Writing、Reading 或 Speaking 模块。
+
 ### Out of Scope for the Current MVP
 
-- Writing、Reading 和 Speaking 模块。
 - 用户登录、云端同步和学习记录。
 - Voice Studio 和声音克隆。
 - 多角色 TTS、音频拼接和逐句时间轴。
+- 按题型生成题目、答案或解析。
 - 填空练习、逐句精听和答案解析。
 - 付费、订阅和社交功能。
 - 为未来功能提前建立复杂扩展架构。

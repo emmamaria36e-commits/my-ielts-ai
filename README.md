@@ -4,12 +4,9 @@ AI-powered IELTS listening practice. Turn your vocabulary into contextual IELTS 
 
 ## Project Status
 
-My IELTS AI is moving from a static UI demo into a focused Listening MVP. The current prototype supports vocabulary input, scene and voice selection, mock passage generation, transcript display, and custom audio-player controls.
+My IELTS AI is a focused Listening MVP. It supports batch vocabulary input, IELTS Listening Section 1–4 selection, real AI passage generation, single-voice speech synthesis, transcript display, and custom audio-player controls.
 
-The following parts are not production-ready yet:
-
-- Audio is currently a short demo tone rather than real text-to-speech.
-- A real model provider has not yet been tested with production credentials.
+The local server currently supports a protected DeepSeek-compatible model API and Azure Speech credentials through environment variables.
 
 ## MVP Goal
 
@@ -22,7 +19,7 @@ Target vocabulary
 → playback, transcript, and vocabulary review
 ```
 
-Writing, Reading, Speaking, user accounts, multi-speaker audio, and Voice Studio are outside the current MVP.
+The product is intentionally focused on IELTS Listening and does not plan to expand into Writing, Reading, or Speaking tools. User accounts, multi-speaker audio, and Voice Studio remain outside the current MVP.
 
 ## Technology
 
@@ -42,7 +39,7 @@ Node.js 20.12 or newer is required for the server-backed flow.
 
 Pages served by Node use the protected server API automatically. Opening `index.html` directly uses the offline Mock Provider instead, so the UI can still be reviewed without a key.
 
-The Mock Provider is a deterministic development fixture: it combines a stable scene passage with a vocabulary-focus paragraph that contains every validated target word. It verifies the application flow but does not represent real AI writing quality.
+The Mock Provider is a lightweight deterministic development fixture. It verifies the application flow but does not represent real AI writing quality.
 
 Do not place API keys in `index.html`, browser configuration, or client-side JavaScript. The local `.env` file is ignored by Git and is read only by the Node server.
 

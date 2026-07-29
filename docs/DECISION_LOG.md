@@ -81,15 +81,98 @@
 负面影响：
 
 - 不严格遵守 JSON 的模型响应会直接失败。
-- 在获得真实调用数据前，不自动重试或修复失败响应。
+- 真实调用观察到偶发无效 JSON、缺词和供应商临时失败后，服务端现最多自动重试一次。缺词时让模型定向修订上一版草稿，其他可恢复失败重新生成；修订结果仍经过相同严格校验，不进行宽松解析。
 - 目标词匹配暂时以英文单词和短语边界为准。
 
 ### Revisit When
 
-获得真实供应商的失败数据后，再评估是否增加一次受控修复请求；不得通过恢复宽松 HTML 或 JSON 解析来降低失败率。
+当一次受控重试仍无法满足实际可靠性时，再根据失败类型评估更精细的处理；不得通过恢复宽松 HTML 或 JSON 解析来降低失败率。
 
 ### Related
 
 - Development record: [DEV-003](DEVELOPMENT_LOG.md#dev-003--验证并安全展示模型结果)
 - Bug note: [BUG-002](BUG_NOTES.md#bug-002--模型-html-被直接写入页面)
 - Implementation: P0 Commit 2
+
+## DEC-003 — 使用服务端 Azure Speech REST API 生成单声音音频
+
+- **Date:** 2026-07-29
+- **Status:** Accepted
+- **Implementation:** Implemented
+
+### Context
+
+Listening MVP 需要把已验证的 AI 正文转换为与页面内容一致的真实语音。浏览器不能持有 Speech 密钥，当前阶段也不需要多角色拼接、时间轴或 Speech SDK 的高级事件能力。
+
+### Options Considered
+
+1. 浏览器直接调用 Azure Speech。
+2. Node 服务端通过 Azure Speech REST API 合成音频。
+3. 引入 Azure Speech SDK。
+
+### Decision
+
+选择由现有 Node 服务端调用 Azure Speech REST API。浏览器只向 `/api/speech` 提交正文和一个产品 voice key；服务端验证输入、映射受信任的 Azure voice、转义 XML、构造 SSML 并返回 MP3。
+
+### Why
+
+该方案复用现有可信边界和原生 `fetch`，不增加运行依赖，也不暴露密钥。当前需求是一段文本生成一条音频，REST API 已能覆盖。
+
+### Consequences
+
+正面影响：
+
+- Speech 密钥、区域和 Azure voice name 不进入浏览器。
+- 前端现有播放器可以直接加载 MP3。
+- 声音选择和 SSML 构造由服务端白名单控制。
+
+负面影响：
+
+- 每次生成正文后都会产生一次实时合成请求和相应费用。
+- 当前没有音频缓存、持久化、自动重试或逐句时间轴。
+- 多角色文本仍使用一个声音朗读。
+
+### Revisit When
+
+需要流式音频、单词边界事件、逐句时间轴、多角色音频或更复杂的合成控制时，再评估 Speech SDK、缓存和音频处理管线。
+
+### Related
+
+- Development record: [DEV-005](DEVELOPMENT_LOG.md#dev-005--接入单声音-azure-speech)
+- Roadmap: P0 Step 4
+
+## DEC-004 — 以 IELTS Listening Section 1–4 决定文本结构
+
+- **Date:** 2026-07-29
+- **Status:** Accepted
+- **Implementation:** Implemented
+
+### Context
+
+原有 Scene 同时混合了使用场景、对话形式和学术主题，不能准确表达 IELTS Listening 四个 Section 的文本结构与考点差异。Voice 选择也不应反过来决定正文是对话还是独白。
+
+### Decision
+
+- 页面和生成接口使用 Section 1–4，不再提交旧 Scene。
+- Section 1、3 生成带明确说话人标签的对话；Section 2、4 生成单人独白。
+- 每个 Section 的 Prompt 分别约束实际语境、信息组织和典型听力特征。
+- Voice 只用于选择整篇正文的 TTS 音色，不参与内容结构判断。
+
+### Consequences
+
+正面影响：
+
+- 用户选择与 IELTS Listening 的正式结构一致。
+- Prompt 可以针对不同 Section 形成更真实的互动和信息组织。
+- 内容生成与声音合成职责保持清晰。
+
+负面影响：
+
+- 当前单声音 TTS 会用同一音色朗读 Section 1、3 的全部角色。
+- 旧 Scene 字段不再兼容；当前项目没有持久化数据，因此无需迁移。
+- 本阶段只生成听力原文，不生成题目、答案或按题型校验。
+
+### Related
+
+- Development record: [DEV-006](DEVELOPMENT_LOG.md#dev-006--按-ielts-listening-section-生成正文)
+- Roadmap: P0 Step 5

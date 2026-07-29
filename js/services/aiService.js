@@ -34,7 +34,7 @@
    *
    * @param {Object} params
    * @param {string[]} params.words      - target vocabulary (required)
-   * @param {string}   params.scene      - scene key
+   * @param {string}   params.section    - IELTS section key
    * @param {string[]} params.voices     - voice keys
    * @param {string}   params.difficulty - 'easy' | 'medium' | 'hard'
    * @returns {Promise<Object>}
@@ -48,7 +48,7 @@
 
     var request = {
       words: params.words,
-      scene: params.scene || 'academic-lecture',
+      section: params.section || 'section-1',
       voices: params.voices && params.voices.length ? params.voices : ['british-female'],
       difficulty: params.difficulty || 'medium',
     };
