@@ -11,7 +11,7 @@
 | 3 | 修复 Mock Provider 业务一致性 | Completed | Mock 成功结果确实包含全部目标词 |
 | 4 | 接入单声音真实 TTS | Completed | 播放器能够播放与正文一致的真实语音 |
 | 5 | 用 IELTS Listening Section 1–4 替换混合 Scene 分类 | Completed | Section 决定对话或独白结构及考点风格，Voice 只决定 TTS |
-| 6 | 收缩首页 MVP 展示范围 | Planned | 页面承诺与当前可用能力及近期路线一致 |
+| 6 | 收缩首页 MVP 展示范围 | Completed | 页面只展示当前可用的 Listening 生成、播放和原文能力 |
 
 每个 Step 应作为独立、可验证、可回滚的修改处理，不提前混入后续 Step。
 
