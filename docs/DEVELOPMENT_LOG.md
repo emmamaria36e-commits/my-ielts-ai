@@ -79,4 +79,25 @@
 - **Scope:** 未加入无限重试、后台任务、多角色 TTS、音频拼接或宽松模型结果校验。
 - **Validation:** 24 项自动测试通过，覆盖定向修订携带缺失词和上一版草稿、按钮防重复提交、终态错误不进入原文区及 Speech 标签清理；真实 DeepSeek 使用 12 个目标词生成成功并包含全部词；真实 Azure Speech 返回非空 MP3。验证期间实际观察到一次 Azure 超时，新增受控重试后再次请求成功。
 
+## DEV-008 — Generation Pipeline V2
+
+- **Date:** 2026-07-30
+- **Objective:** 保留严格目标词完整性校验，同时减少少量漏词造成的终态失败，并把每个用户请求的模型调用预算控制在两次。
+- **Implementation:** 新增结构化 `inspectPassage()`、`chooseRecoveryAction()` 和 Generation Pipeline 调度；少量缺词调用独立 Repair Prompt 最小修订初稿，大量缺词或无效结果使用第二次完整生成；成功响应保持原有 passage、title、targetWords 和 metadata 结构，并增加 recoveryAction、initialMissingCount 和 requestId。
+- **Target matching:** 文本和目标词统一执行 NFKC、大小写、弯引号和连字符规范化，再按完整英文词元序列比较；标点可作为短语分隔，但不进行词干化或词形扩展。
+- **Logging:** 记录 generation_started、generation_attempt_finished 和 generation_finished JSON 事件；不记录 API Key、完整正文或完整目标词表。
+- **Validation:** 30 项自动测试通过，覆盖 Repair Prompt 保护要求、少量缺词修订、大量缺词重生成、无效 JSON 恢复、两次调用预算、日志字段、接口成功结构、大小写/标点规范化和 study/studying 等词形边界。使用 12 个天文学目标词完成真实 DeepSeek 验证：第一次漏 3 个词，第二次 Repair 成功，响应保留原接口核心字段并返回 recoveryAction、initialMissingCount 和 requestId。
+- **Compatibility:** `/api/generate` 请求字段和主要成功响应字段保持兼容；新增 metadata 只作为附加信息。
+- **Related decision:** [DEC-005](DECISION_LOG.md#dec-005--generation-pipeline-v2-按失败类型使用一次恢复调用)。
+
+## DEV-009 — V2.1 首次生成优化
+
+- **Date:** 2026-07-30
+- **Objective:** 不改变 V2 两次调用预算、Repair 阈值和 `/api/generate` 契约，提升 DeepSeek 首次生成包含全部精确目标词的概率。
+- **Implementation:** 目标词改为 User Prompt 中的编号精确清单，明确禁止复数、时态和派生形式；上游 JSON 增加仅供模型自检的 coverage，服务端不信任也不返回该字段；全部模型调用 temperature 统一为 0.3；长度按 1–8、9–14、15–20 个目标词分别调整为 160–210、190–250、220–290 词。
+- **Anonymous statistics:** 新增 Git 忽略的 `logs/generation.jsonl`，每次请求只保存 section、targetWordCount、firstAttemptMissingCount、recoveryAction、success、totalAttempts 和 durationMs。
+- **Automated validation:** 31 项测试通过，覆盖编号清单、coverage 不进入响应、动态长度边界、temperature、匿名日志字段和既有 V2 分支。
+- **Real benchmark:** 使用相同 12 个天文学目标词、Section 4、Medium 连续执行 10 次：首次成功 5 次，最终成功 10 次，平均调用 1.5 次，平均耗时约 5.54 秒；4 次通过 Repair 恢复，1 次通过 Regenerate 恢复。
+- **Observed limitation:** 模型仍可能不严格遵守建议长度；本轮按确认范围只优化首次目标词覆盖率，未增加长度硬校验或调整 Repair 阈值。
+
 后续只在完成重要里程碑或开发阶段发生明显变化时新增记录。

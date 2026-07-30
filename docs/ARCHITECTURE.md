@@ -43,7 +43,7 @@ Browser
   → POST /api/generate with words, Section, Voice and difficulty
   → Node validates input and builds a Section-specific prompt
   → external model API with server-only credentials
-  → missing words trigger one focused revision of the previous draft; other recoverable failures trigger one fresh retry
+  → a failed first result triggers one focused repair or fresh regeneration within a two-call ceiling
   → Node returns the normalized result
 ```
 
@@ -68,7 +68,10 @@ Browser
 - `/api/generate` 对词汇数量、字符、IELTS Listening Section、声音和难度执行服务端验证。
 - 上游请求设置超时，接口包含基础频率限制和受控错误响应。
 - 模型响应只接受严格 JSON、纯文本 title 和 passage，并验证长度、HTML 和全部目标词。
-- DeepSeek 缺词时保留上一版正文并定向修订实际缺失词；其他临时失败或结果校验失败最多重新生成一次。第二次使用更低随机度，不进行无限重试。
+- Generation Pipeline V2 将总模型调用预算固定为两次：首次结果合格则立即返回；少量缺词时最小修订上一版正文；大量缺词、无效 JSON 或结构错误时重新生成。第二次结果仍经过同一严格校验，见 [DEC-005](DECISION_LOG.md#dec-005--generation-pipeline-v2-按失败类型使用一次恢复调用)。
+- 目标词检测将大小写与 Unicode 标点规范化后按完整词元序列匹配；标点不影响短语检测，但 `study` 不匹配 `studying`，`planet` 不匹配 `planets`。
+- 生成过程输出结构化事件日志，并将匿名汇总追加到 Git 忽略的 `logs/generation.jsonl`；统计只包含 Section、目标词数量、首次缺词数量、恢复动作、成功状态、调用次数和耗时，不包含正文、密钥或完整词表。
+- V2.1 在 User Prompt 中使用编号精确词表和内部 coverage 自检，初稿 temperature 为 0.3；建议长度按目标词数量动态调整为 160–210、190–250 或 220–290 词。coverage 不进入浏览器响应，服务端仍只信任 passage 检测。
 - 页面使用文本节点和可信高亮元素展示正文，不将模型内容写入 `innerHTML`，见 [DEC-002](DECISION_LOG.md#dec-002--模型结果必须验证并以纯文本展示)。
 - Mock Provider 会验证输入，并确保全部目标词进入轻量测试文本；其输出通过与真实 Provider 相同的结果契约，见 [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
 - `/api/speech` 使用服务端 Azure Speech 凭据，将受验证的正文合成为单声音 MP3；声音来自固定白名单，SSML 中的正文经过 XML 转义，见 [DEC-003](DECISION_LOG.md#dec-003--使用服务端-azure-speech-rest-api-生成单声音音频)。
@@ -78,8 +81,8 @@ Browser
 
 ## Remaining P0 Risks
 
-1. 首页展示范围大于当前 MVP，产品范围以 [PRODUCT.md](PRODUCT.md) 为准。
-2. 当前语音为一次性实时生成，不包含缓存、持久化或失败重试。
+1. 当前语音为一次性实时生成，不包含缓存或持久化。
+2. 两次模型调用预算控制成本，但不能保证每次生成最终成功；终态失败保留严格校验并允许用户重新发起。
 
 ## Current Validated Text Flow
 
@@ -88,9 +91,14 @@ Browser
 ```text
 Browser
   → POST /api/generate with structured parameters
-  → Node backend validates input and builds the prompt
-  → AI provider
-  → Node backend parses strict JSON and validates text, length, HTML, and target words
+  → Node backend validates input and builds the initial prompt
+  → AI provider call 1
+  → inspect strict JSON, text, length, HTML, and exact target-word tokens
+  → accept, or choose one recovery action:
+      small missing set → minimal repair of the existing draft
+      large missing set / invalid result → fresh regeneration
+  → AI provider call 2 (only when recovery is needed)
+  → inspect with the same complete validation contract
   → Browser performs a defensive shape check
   → Browser creates text nodes and trusted highlight elements
 ```

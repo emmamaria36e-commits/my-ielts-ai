@@ -7,12 +7,14 @@ const http = require('node:http');
 const path = require('node:path');
 const vm = require('node:vm');
 const wordParser = require('../js/services/wordParser');
-const { buildPrompt } = require('../server/promptBuilder');
+const { buildPrompt, buildRepairPrompt, getLengthRequirement } = require('../server/promptBuilder');
 
 const {
   buildSpeechSsml,
+  chooseRecoveryAction,
   containsTargetWord,
   escapeXml,
+  inspectPassage,
   parseModelContent,
   requestPassage,
   stripSpeakerLabels,
@@ -84,7 +86,34 @@ test('prompt uses Section for content structure and Voice only for playback', ()
   assert.match(sectionFour.system, /academic monologue/i);
   assert.match(sectionFour.system, /one speaker/i);
   assert.match(sectionOne.system, /Voice is playback metadata only/i);
-  assert.match(sectionOne.system, /must be 160-220 words/);
+  assert.match(sectionOne.system, /LENGTH: 160-210 words/);
+  assert.match(sectionOne.user, /Required exact target words:\s+1\. environment\s+2\. sustainable development/);
+  assert.match(sectionOne.user, /Do not pluralize, conjugate, or derive/);
+  assert.match(sectionOne.system, /"coverage"/);
+});
+
+test('initial prompt length changes with target-word count', () => {
+  assert.equal(getLengthRequirement(1), '160-210 words');
+  assert.equal(getLengthRequirement(8), '160-210 words');
+  assert.equal(getLengthRequirement(9), '190-250 words');
+  assert.equal(getLengthRequirement(14), '190-250 words');
+  assert.equal(getLengthRequirement(15), '220-290 words');
+  assert.equal(getLengthRequirement(20), '220-290 words');
+});
+
+test('repair prompt requires a minimal protected revision', () => {
+  const prompt = buildRepairPrompt(
+    params,
+    { title: 'Draft', passage: validPassage },
+    ['sustainable development']
+  );
+
+  assert.match(prompt.system, /Do not remove or alter target words that already appear/);
+  assert.match(prompt.system, /Do not modify unrelated content/);
+  assert.match(prompt.system, /Preserve the original topic, IELTS Section format, structure, and difficulty/);
+  assert.match(prompt.system, /smallest natural changes/);
+  assert.match(prompt.user, /MISSING TARGET WORDS/);
+  assert.match(prompt.user, /EXISTING DRAFT/);
 });
 
 test('strict JSON parser accepts JSON and rejects surrounding text', () => {
@@ -132,13 +161,12 @@ test('every target word or phrase must be present', () => {
     function (error) {
       assert.match(error.message, /every target word/);
       assert.deepEqual(error.missingWords, ['sustainable development']);
-      assert.equal(error.repairDraft.title, 'Title');
       return true;
     }
   );
 });
 
-test('missing target words trigger one focused repair of the previous draft', async () => {
+async function withMockAiServer(responder, callback) {
   const requests = [];
   const upstream = http.createServer((request, response) => {
     let body = '';
@@ -146,17 +174,7 @@ test('missing target words trigger one focused repair of the previous draft', as
     request.on('data', (chunk) => { body += chunk; });
     request.on('end', () => {
       requests.push(JSON.parse(body));
-      const modelResult = requests.length === 1
-        ? {
-            title: 'Urban Environment',
-            passage: 'This listening passage discusses the environment in enough detail for a useful practice exercise.',
-          }
-        : { title: 'Urban Futures', passage: validPassage };
-      const payload = {
-        choices: [{ message: { content: JSON.stringify(modelResult) } }],
-      };
-      response.writeHead(200, { 'Content-Type': 'application/json' });
-      response.end(JSON.stringify(payload));
+      responder(requests.length, requests[requests.length - 1], response);
     });
   });
 
@@ -175,13 +193,7 @@ test('missing target words trigger one focused repair of the previous draft', as
   process.env.AI_PROVIDER = 'test-provider';
 
   try {
-    const result = await requestPassage(params);
-    assert.equal(requests.length, 2);
-    assert.equal(result.metadata.attempts, 2);
-    assert.equal(result.metadata.repaired, true);
-    assert.match(requests[1].messages[1].content, /Missing target words: \["sustainable development"\]/);
-    assert.match(requests[1].messages[1].content, /Previous draft:/);
-    assert.equal(result.passage, validPassage);
+    return await callback(requests);
   } finally {
     await new Promise((resolve) => upstream.close(resolve));
     Object.entries(previous).forEach(([name, value]) => {
@@ -195,13 +207,165 @@ test('missing target words trigger one focused repair of the previous draft', as
       else process.env[envName] = value;
     });
   }
+}
+
+function sendModelResult(response, modelResult) {
+  response.writeHead(200, { 'Content-Type': 'application/json' });
+  response.end(JSON.stringify({
+    choices: [{ message: { content: JSON.stringify(modelResult) } }],
+  }));
+}
+
+const pipelineParams = {
+  ...params,
+  words: [
+    'environment', 'research', 'community', 'policy',
+    'conservation', 'resilience', 'biodiversity', 'ecosystem',
+  ],
+};
+const sixWordDraft = [
+  'This research examines how the environment shapes each community and its public policy.',
+  'It also considers conservation and resilience in practical planning.',
+].join(' ');
+const completePipelinePassage = `${sixWordDraft} Biodiversity supports every healthy ecosystem.`;
+
+test('small missing set uses one focused repair within a two-call budget', async () => {
+  const logs = [];
+  const stats = [];
+  await withMockAiServer((attempt, request, response) => {
+    sendModelResult(response, attempt === 1
+      ? { title: 'Draft', passage: sixWordDraft }
+      : {
+          title: 'Repaired',
+          passage: completePipelinePassage,
+          coverage: pipelineParams.words,
+        });
+  }, async (requests) => {
+    const result = await requestPassage(pipelineParams, {
+      logger: (event) => logs.push(event),
+      statsWriter: (event) => stats.push(event),
+    });
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].temperature, 0.3);
+    assert.match(requests[1].messages[0].content, /smallest natural changes/);
+    assert.equal(result.metadata.attempts, 2);
+    assert.equal(result.metadata.repaired, true);
+    assert.equal(result.metadata.recoveryAction, 'repair');
+    assert.equal(result.metadata.initialMissingCount, 2);
+    assert.equal(typeof result.passage, 'string');
+    assert.equal(typeof result.title, 'string');
+    assert.deepEqual(result.targetWords, pipelineParams.words);
+    assert.equal(result.coverage, undefined);
+    assert.equal(logs.length, 4);
+    assert.equal(logs.at(-1).success, true);
+    assert.equal(logs.at(-1).totalAttempts, 2);
+    assert.equal(JSON.stringify(logs).includes('biodiversity'), false);
+    assert.deepEqual(Object.keys(stats[0]).sort(), [
+      'durationMs',
+      'firstAttemptMissingCount',
+      'recoveryAction',
+      'section',
+      'success',
+      'targetWordCount',
+      'totalAttempts',
+    ]);
+    assert.equal(stats[0].firstAttemptMissingCount, 2);
+    assert.equal(stats[0].success, true);
+    assert.equal(JSON.stringify(stats).includes('biodiversity'), false);
+  });
 });
 
-test('target matching is case-insensitive and respects word boundaries', () => {
+test('large missing set regenerates instead of repairing', async () => {
+  await withMockAiServer((attempt, request, response) => {
+    sendModelResult(response, attempt === 1
+      ? { title: 'Weak draft', passage: 'This environment report provides enough introductory material for a listening passage.' }
+      : { title: 'Regenerated', passage: completePipelinePassage });
+  }, async (requests) => {
+    const result = await requestPassage(pipelineParams, { logger: function () {} });
+    assert.equal(requests.length, 2);
+    assert.match(requests[1].messages[0].content, /expert IELTS Listening script writer/);
+    assert.equal(result.metadata.recoveryAction, 'regenerate');
+  });
+});
+
+test('pipeline stops after two failed model calls', async () => {
+  await withMockAiServer((attempt, request, response) => {
+    sendModelResult(response, {
+      title: 'Incomplete',
+      passage: 'This environment report provides enough introductory material for a listening passage.',
+    });
+  }, async (requests) => {
+    await assert.rejects(
+      requestPassage(pipelineParams, { logger: function () {} }),
+      /every target word/
+    );
+    assert.equal(requests.length, 2);
+  });
+});
+
+test('invalid JSON uses the second call for a fresh generation', async () => {
+  await withMockAiServer((attempt, request, response) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({
+      choices: [{
+        message: {
+          content: attempt === 1
+            ? 'not-json'
+            : JSON.stringify({ title: 'Regenerated', passage: completePipelinePassage }),
+        },
+      }],
+    }));
+  }, async (requests) => {
+    const result = await requestPassage(pipelineParams, { logger: function () {} });
+    assert.equal(requests.length, 2);
+    assert.equal(result.metadata.recoveryAction, 'regenerate');
+    assert.equal(result.metadata.attempts, 2);
+  });
+});
+
+test('target matching normalizes case and punctuation but requires exact lexical tokens', () => {
   assert.equal(containsTargetWord('The ENVIRONMENT matters.', 'environment'), true);
   assert.equal(containsTargetWord('Sustainable development matters.', 'sustainable development'), true);
   assert.equal(containsTargetWord('Sustainable\ndevelopment matters.', 'sustainable development'), true);
+  assert.equal(containsTargetWord('Sustainable, development matters.', 'sustainable development'), true);
+  assert.equal(containsTargetWord('A long-term policy.', 'long term'), true);
+  assert.equal(containsTargetWord('The learner’s feedback.', "learner's"), true);
   assert.equal(containsTargetWord('This is partial evidence.', 'art'), false);
+  assert.equal(containsTargetWord('She is studying today.', 'study'), false);
+  assert.equal(containsTargetWord('Several planets are visible.', 'planet'), false);
+});
+
+test('recovery decision repairs only a small missing set', () => {
+  assert.equal(chooseRecoveryAction({
+    valid: false,
+    failureType: 'missing-target-words',
+    missingWords: ['biodiversity', 'ecosystem'],
+  }, 1, 8), 'repair');
+  assert.equal(chooseRecoveryAction({
+    valid: false,
+    failureType: 'missing-target-words',
+    missingWords: ['research', 'policy'],
+  }, 1, 4), 'regenerate');
+  assert.equal(chooseRecoveryAction({
+    valid: false,
+    failureType: 'invalid-structure',
+  }, 1, 8), 'regenerate');
+  assert.equal(chooseRecoveryAction({
+    valid: false,
+    failureType: 'missing-target-words',
+    missingWords: ['ecosystem'],
+  }, 2, 8), 'fail');
+});
+
+test('inspectPassage reports a structured missing-word result', () => {
+  const inspection = inspectPassage(
+    { title: 'Draft', passage: sixWordDraft },
+    pipelineParams
+  );
+  assert.equal(inspection.valid, false);
+  assert.equal(inspection.failureType, 'missing-target-words');
+  assert.deepEqual(inspection.missingWords, ['biodiversity', 'ecosystem']);
+  assert.equal(inspection.candidate.title, 'Draft');
 });
 
 test('frontend transcript rendering does not assign model content to innerHTML', () => {
@@ -341,7 +505,9 @@ test('speech removes trusted dialogue labels without changing transcript text', 
 test('generate button is disabled while an AI request is in progress', () => {
   const generatorPath = path.join(__dirname, '..', 'js', 'generator.js');
   const source = fs.readFileSync(generatorPath, 'utf8');
-  assert.match(source, /submitBtn\.disabled = true/);
+  assert.match(source, /setGeneratingState\(true\)/);
+  assert.match(source, /正在生成学习材料…/);
+  assert.match(source, /aria-busy/);
   assert.match(source, /classList\.contains\('loading'\)/);
 });
 

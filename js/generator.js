@@ -11,6 +11,7 @@
   const tagInputStatus = document.getElementById('tagInputStatus');
   const submitBtn = document.getElementById('generateBtn');
   const submitText = submitBtn?.querySelector('.generator__submit-text');
+  const idleSubmitLabel = submitText ? submitText.textContent : '✨ 生成我的听力材料';
 
   /* ── State ── */
   const words = [];
@@ -237,6 +238,18 @@
     submitBtn.disabled = words.length === 0;
   }
 
+  function setGeneratingState(isGenerating) {
+    if (!submitBtn) return;
+    submitBtn.classList.toggle('loading', isGenerating);
+    submitBtn.setAttribute('aria-busy', String(isGenerating));
+    submitBtn.disabled = isGenerating || words.length === 0;
+    if (submitText) {
+      submitText.textContent = isGenerating
+        ? '正在生成学习材料…'
+        : idleSubmitLabel;
+    }
+  }
+
   // Initial state
   updateSubmitState();
 
@@ -253,8 +266,7 @@
     var voices = [voice];
 
     // Show loading state
-    submitBtn.classList.add('loading');
-    submitBtn.disabled = true;
+    setGeneratingState(true);
     setTagInputStatus('', '');
 
     // Call AI Service to generate passage
@@ -265,8 +277,7 @@
       difficulty: 'medium',
     })
       .then(function (result) {
-        submitBtn.classList.remove('loading');
-        updateSubmitState();
+        setGeneratingState(false);
         setTagInputStatus('', '');
 
         // Dispatch custom event with the result
@@ -284,8 +295,7 @@
         document.dispatchEvent(event);
       })
       .catch(function (error) {
-        submitBtn.classList.remove('loading');
-        updateSubmitState();
+        setGeneratingState(false);
         console.error('[Generator] AI generation failed:', error);
 
         // Keep any previous successful result visible and avoid exposing

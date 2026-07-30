@@ -1,6 +1,7 @@
 # Dependencies and local runtime files
 node_modules/
 npm-debug.log*
+logs/*.jsonl
 
 # Secrets
 .env

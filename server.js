@@ -3,10 +3,12 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { buildPrompt } = require('./server/promptBuilder');
+const { randomUUID } = require('crypto');
+const { buildPrompt, buildRepairPrompt } = require('./server/promptBuilder');
 
 const ROOT = __dirname;
 const ENV_FILE = path.join(ROOT, '.env');
+const GENERATION_LOG_FILE = path.join(ROOT, 'logs', 'generation.jsonl');
 if (fs.existsSync(ENV_FILE)) {
   process.loadEnvFile(ENV_FILE);
 }
@@ -24,6 +26,8 @@ const HTML_PATTERN = /[<>]/;
 const SPEECH_REGION_PATTERN = /^[a-z0-9-]+$/;
 const SPEECH_OUTPUT_FORMAT = 'audio-24khz-48kbitrate-mono-mp3';
 const AI_MAX_ATTEMPTS = 2;
+const MAX_REPAIR_MISSING_WORDS = 3;
+const MAX_REPAIR_MISSING_RATIO = 0.25;
 const SPEECH_MAX_ATTEMPTS = 2;
 
 const ALLOWED_SECTIONS = new Set([
@@ -304,70 +308,138 @@ function parseModelContent(content) {
   try {
     return JSON.parse(content);
   } catch (error) {
-    throw createHttpError(502, 'AI provider returned invalid JSON.');
+    const httpError = createHttpError(502, 'AI provider returned invalid JSON.');
+    httpError.failureType = 'invalid-json';
+    throw httpError;
   }
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function tokenizeForTargetMatch(value) {
+  const normalized = String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u2010-\u2015-]/g, ' ');
+  return normalized.match(/[a-z]+(?:'[a-z]+)*/g) || [];
 }
 
 function containsTargetWord(passage, targetWord) {
-  const escaped = escapeRegExp(targetWord.trim()).replace(/\s+/g, '\\s+');
-  const pattern = new RegExp(`(^|[^A-Za-z0-9])${escaped}(?=$|[^A-Za-z0-9])`, 'i');
-  return pattern.test(passage);
+  const passageTokens = tokenizeForTargetMatch(passage);
+  const targetTokens = tokenizeForTargetMatch(targetWord);
+  if (!targetTokens.length || targetTokens.length > passageTokens.length) return false;
+
+  for (let start = 0; start <= passageTokens.length - targetTokens.length; start += 1) {
+    const matches = targetTokens.every((token, offset) => passageTokens[start + offset] === token);
+    if (matches) return true;
+  }
+  return false;
 }
 
-function validateModelResult(parsed, params) {
+function inspectPassage(parsed, params) {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw createHttpError(502, 'AI provider returned an invalid result structure.');
+    return { valid: false, failureType: 'invalid-structure' };
   }
 
   if (typeof parsed.title !== 'string' || typeof parsed.passage !== 'string') {
-    throw createHttpError(502, 'AI result must contain a text title and passage.');
+    return { valid: false, failureType: 'invalid-fields' };
   }
 
   const title = parsed.title.trim();
   const passage = parsed.passage.trim();
+  const candidate = { title, passage };
 
   if (!title || title.length > MAX_TITLE_CHARS) {
-    throw createHttpError(502, 'AI result title has an invalid length.');
+    return { valid: false, failureType: 'invalid-title', candidate };
   }
 
   if (passage.length < MIN_PASSAGE_CHARS || passage.length > MAX_PASSAGE_CHARS) {
-    throw createHttpError(502, 'AI result passage has an invalid length.');
+    return { valid: false, failureType: 'invalid-passage-length', candidate };
   }
 
   if (HTML_PATTERN.test(title) || HTML_PATTERN.test(passage)) {
-    throw createHttpError(502, 'AI result must not contain HTML.');
+    return { valid: false, failureType: 'html-content', candidate };
   }
 
   const missingWords = params.words.filter((word) => !containsTargetWord(passage, word));
   if (missingWords.length) {
-    const error = createHttpError(502, 'AI result did not include every target word.');
-    error.missingWords = missingWords;
-    error.repairDraft = { title, passage };
-    throw error;
+    return {
+      valid: false,
+      failureType: 'missing-target-words',
+      missingWords,
+      candidate,
+    };
   }
 
-  return { title, passage };
+  return { valid: true, candidate, missingWords: [] };
 }
 
-async function requestPassageAttempt(params, config, endpoint, attempt, repairContext) {
-  const prompt = buildPrompt(params);
-  const userMessage = repairContext
-    ? [
-        'Revise the previous draft instead of writing a new script.',
-        `Missing target words: ${JSON.stringify(repairContext.missingWords)}.`,
-        'Naturally add every missing target word exactly as supplied while preserving the Section format, coherence, and required length.',
-        'Return the complete revised title and passage as ONLY valid JSON.',
-        `Previous draft: ${JSON.stringify(repairContext.draft)}`,
-      ].join('\n')
-    : attempt === 1
-      ? prompt.user
-      : `${prompt.user}\nA previous response failed validation. Check the JSON format and include every target word before responding.`;
+function inspectionToError(inspection) {
+  const messages = {
+    'invalid-structure': 'AI provider returned an invalid result structure.',
+    'invalid-fields': 'AI result must contain a text title and passage.',
+    'invalid-title': 'AI result title has an invalid length.',
+    'invalid-passage-length': 'AI result passage has an invalid length.',
+    'html-content': 'AI result must not contain HTML.',
+    'missing-target-words': 'AI result did not include every target word.',
+  };
+  const error = createHttpError(502, messages[inspection.failureType] || 'AI result failed validation.');
+  error.failureType = inspection.failureType;
+  if (inspection.missingWords) error.missingWords = inspection.missingWords.slice();
+  return error;
+}
+
+function validateModelResult(parsed, params) {
+  const inspection = inspectPassage(parsed, params);
+  if (!inspection.valid) throw inspectionToError(inspection);
+  return inspection.candidate;
+}
+
+function chooseRecoveryAction(inspection, attemptsUsed, targetWordCount) {
+  if (inspection.valid) return 'accept';
+  if (attemptsUsed >= AI_MAX_ATTEMPTS) return 'fail';
+
+  if (inspection.failureType === 'missing-target-words') {
+    const missingCount = inspection.missingWords.length;
+    const missingRatio = missingCount / Math.max(1, targetWordCount);
+    return missingCount <= MAX_REPAIR_MISSING_WORDS && missingRatio <= MAX_REPAIR_MISSING_RATIO
+      ? 'repair'
+      : 'regenerate';
+  }
+
+  return 'regenerate';
+}
+
+function emitGenerationLog(logger, event) {
+  const entry = {
+    scope: 'generation',
+    timestamp: new Date().toISOString(),
+    ...event,
+  };
+  if (logger) logger(entry);
+  else console.info(JSON.stringify(entry));
+}
+
+async function appendGenerationStats(stats) {
+  await fs.promises.mkdir(path.dirname(GENERATION_LOG_FILE), { recursive: true });
+  await fs.promises.appendFile(GENERATION_LOG_FILE, `${JSON.stringify(stats)}\n`, 'utf8');
+}
+
+async function saveGenerationStats(writer, stats) {
+  if (!writer) return;
+  try {
+    await writer(stats);
+  } catch (error) {
+    console.error('[Generation Stats] Could not append anonymous statistics.');
+  }
+}
+
+async function requestPassageAttempt(params, config, endpoint, mode, repairContext) {
+  const prompt = mode === 'repair'
+    ? buildRepairPrompt(params, repairContext.draft, repairContext.missingWords)
+    : buildPrompt(params);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const startedAt = Date.now();
 
   try {
     const upstream = await fetch(endpoint, {
@@ -380,9 +452,9 @@ async function requestPassageAttempt(params, config, endpoint, attempt, repairCo
         model: config.model,
         messages: [
           { role: 'system', content: prompt.system },
-          { role: 'user', content: userMessage },
+          { role: 'user', content: prompt.user },
         ],
-        temperature: attempt === 1 ? 0.6 : 0.3,
+        temperature: 0.3,
         max_tokens: 2048,
         response_format: { type: 'json_object' },
       }),
@@ -391,49 +463,43 @@ async function requestPassageAttempt(params, config, endpoint, attempt, repairCo
 
     if (!upstream.ok) {
       console.error(`[AI API] Upstream request failed with status ${upstream.status}.`);
-      throw createHttpError(502, 'AI provider request failed.');
+      const status = upstream.status === 429 ? 429 : 502;
+      const error = createHttpError(status, 'AI provider request failed.');
+      error.failureType = upstream.status === 429 ? 'provider-rate-limit' : 'provider-error';
+      throw error;
     }
 
     const data = await upstream.json();
     const content = data && data.choices && data.choices[0]
       && data.choices[0].message && data.choices[0].message.content;
     if (typeof content !== 'string' || !content.trim()) {
-      throw createHttpError(502, 'AI provider returned an empty response.');
+      const emptyError = createHttpError(502, 'AI provider returned an empty response.');
+      emptyError.failureType = 'empty-response';
+      throw emptyError;
     }
 
-    const parsed = parseModelContent(content);
-    const validated = validateModelResult(parsed, params);
-    const passage = validated.passage;
-    const title = validated.title;
-
     return {
-      passage,
-      title,
-      targetWords: params.words.slice(),
-      metadata: {
-        section: params.section,
-        difficulty: params.difficulty,
-        voices: params.voices.slice(),
-        wordCount: passage.split(/\s+/).filter(Boolean).length,
-        generatedBy: config.provider,
-        model: config.model,
-        generatedAt: new Date().toISOString(),
-        usage: data.usage || null,
-      },
+      candidate: parseModelContent(content),
+      usage: data.usage || null,
+      durationMs: Date.now() - startedAt,
     };
   } catch (error) {
     if (error.name === 'AbortError') {
-      throw createHttpError(504, 'AI provider request timed out.');
+      const timeoutError = createHttpError(504, 'AI provider request timed out.');
+      timeoutError.failureType = 'provider-timeout';
+      throw timeoutError;
     }
     if (error.status) throw error;
     console.error('[AI API] Upstream response could not be processed.');
-    throw createHttpError(502, 'AI provider could not be reached or returned an unreadable response.');
+    const responseError = createHttpError(502, 'AI provider could not be reached or returned an unreadable response.');
+    responseError.failureType = 'provider-unreadable';
+    throw responseError;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function requestPassage(params) {
+async function requestPassage(params, options = {}) {
   const config = getAiConfig();
   if (!config.apiKey) {
     throw createHttpError(503, 'AI service is not configured on the server.');
@@ -451,31 +517,157 @@ async function requestPassage(params) {
     throw createHttpError(500, 'AI service endpoint must use HTTPS.');
   }
 
-  let lastError;
+  const requestId = randomUUID();
+  const pipelineStartedAt = Date.now();
+  const statsWriter = options.statsWriter !== undefined
+    ? options.statsWriter
+    : options.logger
+      ? null
+      : appendGenerationStats;
+  let mode = 'initial';
   let repairContext = null;
+  let recoveryAction = 'none';
+  let initialMissingCount = 0;
+
+  emitGenerationLog(options.logger, {
+    event: 'generation_started',
+    requestId,
+    section: params.section,
+    difficulty: params.difficulty,
+    targetWordCount: params.words.length,
+  });
+
   for (let attempt = 1; attempt <= AI_MAX_ATTEMPTS; attempt += 1) {
+    const attemptStartedAt = Date.now();
     try {
-      const result = await requestPassageAttempt(params, config, endpoint, attempt, repairContext);
-      result.metadata.attempts = attempt;
-      result.metadata.repaired = Boolean(repairContext);
-      return result;
-    } catch (error) {
-      lastError = error;
-      if (error.status !== 502 || attempt === AI_MAX_ATTEMPTS) {
+      const upstreamResult = await requestPassageAttempt(
+        params,
+        config,
+        endpoint,
+        mode,
+        repairContext
+      );
+      const inspection = inspectPassage(upstreamResult.candidate, params);
+      const action = chooseRecoveryAction(inspection, attempt, params.words.length);
+
+      emitGenerationLog(options.logger, {
+        event: 'generation_attempt_finished',
+        requestId,
+        attempt,
+        mode,
+        result: inspection.valid ? 'valid' : inspection.failureType,
+        missingWordCount: inspection.missingWords ? inspection.missingWords.length : 0,
+        durationMs: upstreamResult.durationMs,
+      });
+
+      if (action === 'accept') {
+        const { title, passage } = inspection.candidate;
+        emitGenerationLog(options.logger, {
+          event: 'generation_finished',
+          requestId,
+          success: true,
+          totalAttempts: attempt,
+          recoveryAction,
+          totalDurationMs: Date.now() - pipelineStartedAt,
+        });
+        await saveGenerationStats(statsWriter, {
+          section: params.section,
+          targetWordCount: params.words.length,
+          firstAttemptMissingCount: initialMissingCount,
+          recoveryAction,
+          success: true,
+          totalAttempts: attempt,
+          durationMs: Date.now() - pipelineStartedAt,
+        });
+        return {
+          passage,
+          title,
+          targetWords: params.words.slice(),
+          metadata: {
+            section: params.section,
+            difficulty: params.difficulty,
+            voices: params.voices.slice(),
+            wordCount: passage.split(/\s+/).filter(Boolean).length,
+            generatedBy: config.provider,
+            model: config.model,
+            generatedAt: new Date().toISOString(),
+            usage: upstreamResult.usage,
+            attempts: attempt,
+            repaired: recoveryAction === 'repair',
+            recoveryAction,
+            initialMissingCount,
+            requestId,
+          },
+        };
+      }
+
+      if (action === 'fail') {
+        const error = inspectionToError(inspection);
+        error.attemptAlreadyLogged = true;
         throw error;
       }
-      repairContext = error.repairDraft && Array.isArray(error.missingWords)
-        ? { draft: error.repairDraft, missingWords: error.missingWords.slice() }
+
+      recoveryAction = action;
+      if (attempt === 1 && inspection.missingWords) {
+        initialMissingCount = inspection.missingWords.length;
+      }
+      mode = action;
+      repairContext = action === 'repair'
+        ? {
+            draft: inspection.candidate,
+            missingWords: inspection.missingWords.slice(),
+          }
         : null;
-      console.warn(
-        repairContext
-          ? `[AI API] Target words missing; repairing draft once (attempt ${attempt + 1}).`
-          : `[AI API] Validation or provider failure; retrying once (attempt ${attempt + 1}).`
-      );
+    } catch (error) {
+      const canRetry = attempt < AI_MAX_ATTEMPTS
+        && error.status !== 429
+        && error.status !== 400
+        && error.status !== 500
+        && error.status !== 503;
+
+      if (!error.attemptAlreadyLogged) {
+        emitGenerationLog(options.logger, {
+          event: 'generation_attempt_finished',
+          requestId,
+          attempt,
+          mode,
+          result: error.failureType || 'provider-failure',
+          missingWordCount: Array.isArray(error.missingWords) ? error.missingWords.length : 0,
+          durationMs: Date.now() - attemptStartedAt,
+        });
+      }
+
+      if (canRetry) {
+        recoveryAction = 'regenerate';
+        mode = 'regenerate';
+        repairContext = null;
+        continue;
+      }
+
+      emitGenerationLog(options.logger, {
+        event: 'generation_finished',
+        requestId,
+        success: false,
+        totalAttempts: attempt,
+        recoveryAction,
+        failureType: error.failureType || 'provider-failure',
+        totalDurationMs: Date.now() - pipelineStartedAt,
+      });
+      await saveGenerationStats(statsWriter, {
+        section: params.section,
+        targetWordCount: params.words.length,
+        firstAttemptMissingCount: initialMissingCount,
+        recoveryAction,
+        success: false,
+        totalAttempts: attempt,
+        durationMs: Date.now() - pipelineStartedAt,
+      });
+      error.requestId = requestId;
+      throw error;
     }
   }
 
-  throw lastError;
+  throw createHttpError(502, 'AI generation pipeline exhausted its request budget.');
 }
 
 async function requestSpeechAttempt(params, config, endpoint) {
@@ -614,7 +806,17 @@ async function handleRequest(request, response) {
       }
       sendJson(response, status, {
         error: {
+          code: error.failureType === 'provider-rate-limit'
+            ? 'AI_PROVIDER_RATE_LIMITED'
+            : status === 400
+              ? 'INVALID_GENERATION_REQUEST'
+              : status === 503
+                ? 'AI_SERVICE_NOT_CONFIGURED'
+                : status === 504
+                  ? 'AI_PROVIDER_TIMEOUT'
+                  : 'GENERATION_VALIDATION_FAILED',
           message: status >= 500 && !error.status ? 'Unexpected server error.' : error.message,
+          requestId: error.requestId,
         },
       });
     }
@@ -686,8 +888,10 @@ if (require.main === module) {
 module.exports = {
   buildSpeechSsml,
   createServer,
+  chooseRecoveryAction,
   containsTargetWord,
   escapeXml,
+  inspectPassage,
   parseModelContent,
   requestPassage,
   stripSpeakerLabels,

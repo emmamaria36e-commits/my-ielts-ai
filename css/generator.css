@@ -405,15 +405,15 @@
 /* ── Loading state ── */
 .generator__submit.loading {
   pointer-events: none;
+  opacity: 1;
 }
 
 .generator__submit.loading .generator__submit-text {
-  opacity: 0;
+  opacity: 1;
 }
 
 .generator__submit-spinner {
   display: none;
-  position: absolute;
   width: 20px;
   height: 20px;
   border: 2px solid rgba(255, 255, 255, 0.3);
@@ -424,6 +424,10 @@
 
 .generator__submit.loading .generator__submit-spinner {
   display: block;
+}
+
+.generator__submit.loading .generator__submit-icon {
+  display: none;
 }
 
 @keyframes spin {
