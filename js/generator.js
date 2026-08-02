@@ -461,15 +461,21 @@
 
     window._activePlayer = player;
     setAudioStatus('正在生成语音…', false);
+    var longSpeechTimer = window.setTimeout(function () {
+      if (window._activePlayer !== player) return;
+      setAudioStatus('长文本音频通常需要约 30–60 秒，请稍候…', false);
+    }, 12000);
 
     window.SpeechService.generate(text, voice)
       .then(function (audioBlob) {
+        window.clearTimeout(longSpeechTimer);
         if (window._activePlayer !== player) return;
         activeAudioUrl = URL.createObjectURL(audioBlob);
         player.load(activeAudioUrl);
         setAudioStatus('语音已生成，可以开始播放。', false);
       })
       .catch(function (error) {
+        window.clearTimeout(longSpeechTimer);
         if (window._activePlayer !== player) return;
         console.error('[Generator] Speech generation failed:', error);
         setAudioStatus(

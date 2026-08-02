@@ -55,7 +55,7 @@ Browser
   → POST /api/speech with validated passage text and one trusted voice key
   → Node validates text and maps the voice key to an Azure voice
   → Azure Speech with server-only credentials and escaped SSML
-  → one controlled retry for a temporary provider failure or timeout
+  → wait up to 90 seconds; retry once only when Azure explicitly returns HTTP 502
   → Node returns MP3 audio
   → existing player loads a temporary browser object URL
 ```
@@ -75,7 +75,8 @@ Browser
 - 页面使用文本节点和可信高亮元素展示正文，不将模型内容写入 `innerHTML`，见 [DEC-002](DECISION_LOG.md#dec-002--模型结果必须验证并以纯文本展示)。
 - Mock Provider 会验证输入，并确保全部目标词进入轻量测试文本；其输出通过与真实 Provider 相同的结果契约，见 [BUG-001](BUG_NOTES.md#bug-001--mock-provider-虚假报告目标词已包含)。
 - `/api/speech` 使用服务端 Azure Speech 凭据，将受验证的正文合成为单声音 MP3；声音来自固定白名单，SSML 中的正文经过 XML 转义，见 [DEC-003](DECISION_LOG.md#dec-003--使用服务端-azure-speech-rest-api-生成单声音音频)。
-- AI 与 Speech 使用独立的基础频率限制；Speech 临时失败或超时时最多自动重试一次。
+- AI 与 Speech 使用独立的基础频率限制；Speech 单次等待上限为 90 秒，仅在 Azure 明确返回 HTTP 502 时自动重试一次，超时不重复提交长文本合成。
+- Speech 将匿名耗时统计追加到 Git 忽略的 `logs/speech.jsonl`，只记录正文字符数、成功状态、结果类型、调用次数和总耗时，不记录正文或凭据。
 - Section 1、3 的 `Speaker A/B/C:` 标签保留在页面原文中，但在构造 Speech SSML 前移除，避免被朗读。
 - Section 1–4 决定文本是对话还是独白及其内容组织；Voice 只决定 TTS 音色，见 [DEC-004](DECISION_LOG.md#dec-004--以-ielts-listening-section-1-4-决定文本结构)。
 

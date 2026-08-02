@@ -17,6 +17,7 @@ const {
   inspectPassage,
   parseModelContent,
   requestPassage,
+  requestSpeech,
   stripSpeakerLabels,
   validateGenerateRequest,
   validateModelResult,
@@ -502,6 +503,88 @@ test('speech removes trusted dialogue labels without changing transcript text', 
   assert.match(ssml, /The phrase Speaker A remains/);
 });
 
+test('speech retries one explicit Azure 502 and records anonymous success stats', async () => {
+  let upstreamAttempts = 0;
+  const stats = [];
+  const upstream = http.createServer((request, response) => {
+    upstreamAttempts += 1;
+    request.resume();
+    request.on('end', () => {
+      if (upstreamAttempts === 1) {
+        response.writeHead(502);
+        response.end('temporary failure');
+        return;
+      }
+      response.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+      response.end(Buffer.from('test-audio'));
+    });
+  });
+
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = upstream.address();
+    const audio = await requestSpeech(
+      { text: validPassage, voice: 'british-female' },
+      {
+        config: { key: 'test-key', region: 'eastasia' },
+        endpoint: `http://127.0.0.1:${address.port}`,
+        timeoutMs: 1000,
+        statsWriter: (entry) => stats.push(entry),
+      }
+    );
+
+    assert.equal(upstreamAttempts, 2);
+    assert.equal(audio.toString(), 'test-audio');
+    assert.deepEqual(Object.keys(stats[0]).sort(), [
+      'durationMs', 'status', 'success', 'textLength', 'totalAttempts',
+    ]);
+    assert.equal(stats[0].success, true);
+    assert.equal(stats[0].totalAttempts, 2);
+  } finally {
+    await new Promise((resolve) => upstream.close(resolve));
+  }
+});
+
+test('speech timeout does not start another long synthesis request', async () => {
+  let upstreamAttempts = 0;
+  const stats = [];
+  const upstream = http.createServer((request, response) => {
+    upstreamAttempts += 1;
+    request.resume();
+    request.on('end', () => {
+      setTimeout(() => {
+        if (!response.destroyed) {
+          response.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+          response.end(Buffer.from('late-audio'));
+        }
+      }, 100);
+    });
+  });
+
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  try {
+    await assert.rejects(
+      requestSpeech(
+        { text: validPassage, voice: 'british-female' },
+        {
+          config: { key: 'test-key', region: 'eastasia' },
+          endpoint: `http://127.0.0.1:${upstream.address().port}`,
+          timeoutMs: 10,
+          statsWriter: (entry) => stats.push(entry),
+        }
+      ),
+      /timed out/
+    );
+
+    assert.equal(upstreamAttempts, 1);
+    assert.equal(stats[0].success, false);
+    assert.equal(stats[0].status, 'provider-timeout');
+    assert.equal(stats[0].totalAttempts, 1);
+  } finally {
+    await new Promise((resolve) => upstream.close(resolve));
+  }
+});
+
 test('generate button is disabled while an AI request is in progress', () => {
   const generatorPath = path.join(__dirname, '..', 'js', 'generator.js');
   const source = fs.readFileSync(generatorPath, 'utf8');
@@ -509,6 +592,13 @@ test('generate button is disabled while an AI request is in progress', () => {
   assert.match(source, /正在生成学习材料…/);
   assert.match(source, /aria-busy/);
   assert.match(source, /classList\.contains\('loading'\)/);
+});
+
+test('long speech generation shows a patient waiting message', () => {
+  const generatorPath = path.join(__dirname, '..', 'js', 'generator.js');
+  const source = fs.readFileSync(generatorPath, 'utf8');
+  assert.match(source, /长文本音频通常需要约 30–60 秒/);
+  assert.match(source, /clearTimeout\(longSpeechTimer\)/);
 });
 
 test('terminal AI errors stay out of the transcript result area', () => {

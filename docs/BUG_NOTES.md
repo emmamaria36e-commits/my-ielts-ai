@@ -79,3 +79,37 @@ Prompt 要求模型返回 `<b>`，前端随后通过 `innerHTML` 展示 passage�
 - Decision: [DEC-002](DECISION_LOG.md#dec-002--模型结果必须验证并以纯文本展示)
 - Development record: [DEV-003](DEVELOPMENT_LOG.md#dev-003--验证并安全展示模型结果)
 - Fix: P0 Commit 2
+
+## BUG-003 — 长文本语音合成频繁超时
+
+- **Discovered:** 2026-08-02
+- **Resolved:** 2026-08-02
+- **Severity:** P1
+- **Status:** Resolved
+- **Affected components:** `server.js`、`js/generator.js`
+
+### Symptom and Impact
+
+约 160–290 词的 IELTS 原文经常无法生成音频。页面长时间停留在生成状态，最终显示 Speech 超时；超时后自动重试还可能让用户等待接近 90 秒。
+
+### Root Cause
+
+Azure Speech REST API 会在整段 MP3 合成完成后才返回。真实测试中，约 200 词正文需要约 39–40 秒，约 100 词正文需要约 28 秒。原单次超时上限只有 45 秒，长文本的正常耗时已经贴近该上限，轻微网络或服务波动就会触发中止。原逻辑还会在超时后完整重试一次，进一步延长等待并可能重复消耗额度。
+
+### Resolution
+
+- 单次 Speech 等待上限从 45 秒提高到 90 秒。
+- 仅在 Azure 明确返回 HTTP 502 时重试一次；超时不再自动提交第二次长文本合成。
+- 页面在等待 12 秒后提示长文本音频通常需要约 30–60 秒。
+- 新增 Git 忽略的匿名 Speech JSONL 统计，只记录正文字符数、成功状态、结果类型、尝试次数和耗时。
+
+### Validation
+
+- 自动测试验证明确的 Azure 502 只重试一次并可恢复成功。
+- 自动测试验证 Speech 超时只发起一次上游请求。
+- 自动测试验证匿名日志字段不包含正文和凭据。
+- 使用真实 Azure Speech 对长文本执行端到端计时验证。
+
+### Prevention
+
+语音超时阈值应根据实际文本长度与真实服务耗时设置；重试条件必须区分明确的临时 HTTP 错误和已经消耗较长时间的合成超时。

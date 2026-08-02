@@ -9,6 +9,7 @@ const { buildPrompt, buildRepairPrompt } = require('./server/promptBuilder');
 const ROOT = __dirname;
 const ENV_FILE = path.join(ROOT, '.env');
 const GENERATION_LOG_FILE = path.join(ROOT, 'logs', 'generation.jsonl');
+const SPEECH_LOG_FILE = path.join(ROOT, 'logs', 'speech.jsonl');
 if (fs.existsSync(ENV_FILE)) {
   process.loadEnvFile(ENV_FILE);
 }
@@ -16,7 +17,7 @@ if (fs.existsSync(ENV_FILE)) {
 const PORT = parsePort(process.env.PORT || '3000');
 const MAX_BODY_BYTES = 16 * 1024;
 const REQUEST_TIMEOUT_MS = 30 * 1000;
-const SPEECH_REQUEST_TIMEOUT_MS = 45 * 1000;
+const SPEECH_REQUEST_TIMEOUT_MS = 90 * 1000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 20;
 const MAX_TITLE_CHARS = 160;
@@ -433,6 +434,20 @@ async function saveGenerationStats(writer, stats) {
   }
 }
 
+async function appendSpeechStats(stats) {
+  await fs.promises.mkdir(path.dirname(SPEECH_LOG_FILE), { recursive: true });
+  await fs.promises.appendFile(SPEECH_LOG_FILE, `${JSON.stringify(stats)}\n`, 'utf8');
+}
+
+async function saveSpeechStats(writer, stats) {
+  if (!writer) return;
+  try {
+    await writer(stats);
+  } catch (error) {
+    console.error('[Speech Stats] Could not append anonymous statistics.');
+  }
+}
+
 async function requestPassageAttempt(params, config, endpoint, mode, repairContext) {
   const prompt = mode === 'repair'
     ? buildRepairPrompt(params, repairContext.draft, repairContext.missingWords)
@@ -670,9 +685,9 @@ async function requestPassage(params, options = {}) {
   throw createHttpError(502, 'AI generation pipeline exhausted its request budget.');
 }
 
-async function requestSpeechAttempt(params, config, endpoint) {
+async function requestSpeechAttempt(params, config, endpoint, timeoutMs = SPEECH_REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), SPEECH_REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const upstream = await fetch(endpoint, {
@@ -689,7 +704,10 @@ async function requestSpeechAttempt(params, config, endpoint) {
 
     if (!upstream.ok) {
       console.error(`[Speech API] Upstream request failed with status ${upstream.status}.`);
-      throw createHttpError(502, 'Speech provider request failed.');
+      const upstreamError = createHttpError(502, 'Speech provider request failed.');
+      upstreamError.failureType = 'provider-http-error';
+      upstreamError.upstreamStatus = upstream.status;
+      throw upstreamError;
     }
 
     const audio = Buffer.from(await upstream.arrayBuffer());
@@ -700,18 +718,22 @@ async function requestSpeechAttempt(params, config, endpoint) {
     return audio;
   } catch (error) {
     if (error.name === 'AbortError') {
-      throw createHttpError(504, 'Speech provider request timed out.');
+      const timeoutError = createHttpError(504, 'Speech provider request timed out.');
+      timeoutError.failureType = 'provider-timeout';
+      throw timeoutError;
     }
     if (error.status) throw error;
     console.error('[Speech API] Upstream response could not be processed.');
-    throw createHttpError(502, 'Speech provider could not be reached.');
+    const networkError = createHttpError(502, 'Speech provider could not be reached.');
+    networkError.failureType = 'provider-network-error';
+    throw networkError;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function requestSpeech(params) {
-  const config = getSpeechConfig();
+async function requestSpeech(params, options = {}) {
+  const config = options.config || getSpeechConfig();
   if (!config.key || !config.region) {
     throw createHttpError(503, 'Speech service is not configured on the server.');
   }
@@ -720,19 +742,40 @@ async function requestSpeech(params) {
     throw createHttpError(500, 'Speech service region is invalid.');
   }
 
-  const endpoint = `https://${config.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
+  const endpoint = options.endpoint
+    || `https://${config.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
+  const timeoutMs = options.timeoutMs || SPEECH_REQUEST_TIMEOUT_MS;
+  const statsWriter = options.statsWriter === undefined
+    ? appendSpeechStats
+    : options.statsWriter;
+  const startedAt = Date.now();
   let lastError;
 
   for (let attempt = 1; attempt <= SPEECH_MAX_ATTEMPTS; attempt += 1) {
     try {
-      return await requestSpeechAttempt(params, config, endpoint);
+      const audio = await requestSpeechAttempt(params, config, endpoint, timeoutMs);
+      await saveSpeechStats(statsWriter, {
+        textLength: params.text.length,
+        success: true,
+        status: 'success',
+        totalAttempts: attempt,
+        durationMs: Date.now() - startedAt,
+      });
+      return audio;
     } catch (error) {
       lastError = error;
-      const recoverable = error.status === 502 || error.status === 504;
+      const recoverable = error.upstreamStatus === 502;
       if (!recoverable || attempt === SPEECH_MAX_ATTEMPTS) {
+        await saveSpeechStats(statsWriter, {
+          textLength: params.text.length,
+          success: false,
+          status: error.failureType || 'speech-failure',
+          totalAttempts: attempt,
+          durationMs: Date.now() - startedAt,
+        });
         throw error;
       }
-      console.warn(`[Speech API] Temporary failure; retrying once (attempt ${attempt + 1}).`);
+      console.warn(`[Speech API] Azure returned 502; retrying once (attempt ${attempt + 1}).`);
     }
   }
 
@@ -894,6 +937,7 @@ module.exports = {
   inspectPassage,
   parseModelContent,
   requestPassage,
+  requestSpeech,
   stripSpeakerLabels,
   validateGenerateRequest,
   validateModelResult,
