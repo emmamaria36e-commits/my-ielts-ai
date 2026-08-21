@@ -8,7 +8,7 @@
   'use strict';
 
   function generate(text, voice) {
-    return fetch('/api/speech', {
+    return window.BetaAccess.fetch('/api/speech', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -30,7 +30,9 @@
           var message = payload && payload.error && payload.error.message
             ? payload.error.message
             : 'Speech generation failed.';
-          throw new Error(message);
+          var requestError = new Error(message);
+          requestError.status = response.status;
+          throw requestError;
         });
     });
   }

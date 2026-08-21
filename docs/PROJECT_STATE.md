@@ -1,6 +1,15 @@
 # My IELTS AI — Current Project State
 
-Last updated: 2026-08-11
+Last updated: 2026-08-21
+
+## Git Baseline and Working Tree
+
+- **Branch:** `codex/p0-backend-migration`
+- **HEAD:** Current stable Closed Beta security and deployment-readiness commit; use `git rev-parse HEAD` for its exact hash.
+- **Parent security baseline:** `7354adfd03c20725fe6b049360354cbcf21a21d9`
+- **Pre-audit tag:** `pre-security-audit-2026-08-11` remains on the parent baseline, not on current HEAD.
+- Phase 1 Invite Access, Phase 2 Cost Protection, Phase 3A Deployment Readiness, the AGENTS collaboration update, and reconciled documentation are included in current HEAD.
+- Local verification is complete. The commit has not been pushed or deployed.
 
 ## 1. Product Goal
 
@@ -85,6 +94,16 @@ Current environment variable names are:
 - `PORT`
 - `SPEECH_KEY`
 - `SPEECH_REGION`
+- `BETA_INVITE_CODES`
+- `AI_ENABLED`
+- `SPEECH_ENABLED`
+- `AI_GENERATE_DAILY_LIMIT`
+- `SPEECH_DAILY_LIMIT`
+- `GLOBAL_AI_DAILY_LIMIT`
+- `GLOBAL_SPEECH_DAILY_LIMIT`
+- `GLOBAL_AI_CONCURRENCY`
+- `GLOBAL_SPEECH_CONCURRENCY`
+- `TRUST_PROXY_HOPS`
 
 Local values belong in the ignored `.env` file. `.env.example` contains only names, empty credential fields, and non-secret example configuration.
 
@@ -139,7 +158,7 @@ npm run check
 npm test
 ```
 
-As of this checkpoint, the suite contains **34 tests** and passes completely. Coverage includes:
+The current suite contains **77 tests** and passes completely. Coverage includes:
 
 - Request validation and Section rules.
 - Prompt checklist, dynamic length, and repair protections.
@@ -152,6 +171,41 @@ As of this checkpoint, the suite contains **34 tests** and passes completely. Co
 - Azure 502 retry and timeout-without-retry behavior.
 - Loading and long-audio waiting UI.
 - Target-item parsing, deduplication, validation, and limits.
+- Closed-beta invite rejection, anonymous invite identity, sessionStorage/header behavior, 403 replacement flow, and invite Secret isolation.
+- Per-invite/global AI and Speech daily quota, daily reset, concurrency rejection, quota charging semantics, kill switches, slot release, and frontend 429/503 no-retry behavior.
+- Bounded numeric configuration fallback, fixed-hop proxy address selection, and minimal health endpoint isolation.
+
+## 8A. Closed-Beta Implementation Status
+
+### Phase 1 — Invite Access
+
+- **Implemented:** YES.
+- **Tested:** YES. The suite contained 45 passing tests at phase completion.
+- **Committed:** YES. Included in the current stable HEAD.
+- **Deployed:** NO.
+
+### Phase 2 — Cost Protection
+
+- **Implemented:** YES.
+- **Tested:** YES. 70 total passed / 0 failed at phase completion.
+- **Committed:** YES. Included in the current stable HEAD.
+- **Deployed:** NO.
+
+### Phase 3A — Deployment Readiness & Runtime Configuration
+
+- **Implemented:** YES.
+- **Tested:** YES. 77 total passed / 0 failed at phase completion.
+- **Committed:** YES. Included in the current stable HEAD.
+- **Deployed:** NO.
+
+### Phase 3B — Local Production-Like Verification
+
+- **Status:** Local verification complete.
+- **Automated validation:** 77 total passed / 0 failed; `npm run check` passed.
+- **Smoke validation:** Minimal health, invalid invite, AI/Speech kill switch, one real Generate, and one real Speech request passed.
+- **Secret and diff audit:** Passed; no configured Secret value was found in source files intended for commit.
+- **Commit:** YES. Local verification and deployment-readiness work are included in the current stable HEAD.
+- **Deploy:** NOT deployed.
 
 ## 9. Current Known Issues
 
@@ -170,9 +224,13 @@ Operational limitations that remain:
 - AI output is treated as untrusted, strictly validated, and displayed as text.
 - Speech text is validated and XML-escaped before entering trusted SSML.
 - Basic rate limiting: **IMPLEMENTED**. AI and Speech have separate in-memory, per-address limits of 20 requests per 60 seconds.
-- Closed-beta invitation/access code: **NOT IMPLEMENTED**.
-- Daily per-user or global quota: **NOT IMPLEMENTED**.
-- Explicit concurrency control: **NOT IMPLEMENTED**.
+- Closed-beta invitation/access code: **IMPLEMENTED** for `/api/generate` and `/api/speech` through `X-Beta-Invite`; accepted codes come from server environment configuration and are represented internally by SHA-256-derived anonymous IDs.
+- Daily per-invite and global quota: **IMPLEMENTED** in single-process memory, separately for AI and Speech. Defaults are 15/20 per invite and 100/150 globally per server-local day.
+- Explicit concurrency control: **IMPLEMENTED** in single-process memory. Each invite may have one active AI and one active Speech request; default global limits are 3 for each kind.
+- AI/Speech kill switches: **IMPLEMENTED** through fail-safe `AI_ENABLED` and `SPEECH_ENABLED` environment configuration.
+- Protection-related numeric environment values use bounded positive-integer parsing; missing or invalid values fall back to finite Phase 2 defaults.
+- Reverse proxy trust: **IMPLEMENTED** through bounded `TRUST_PROXY_HOPS`; default and invalid values trust no forwarding header.
+- Minimal unauthenticated health endpoint: **IMPLEMENTED** at `GET /health`, returning only `{ "ok": true }` without quota, concurrency, or Provider access.
 - User authentication: **NOT IMPLEMENTED**.
 - Persistent audit/security event storage: **NOT IMPLEMENTED**.
 
@@ -181,9 +239,12 @@ These missing controls must be assessed before public accessibility.
 ## 11. Deployment Status
 
 - Current use is local through `http://localhost:3000`.
-- No public deployment is recorded.
-- No production deployment configuration is present in the repository.
-- The application has a server-side runtime and environment-variable boundary, but closed-beta access protection and deployment-specific security review are not complete.
+- Closed-beta invite access and cost-protection implementation exists locally in the current working tree.
+- Phase 3A deployment-readiness implementation exists locally, but production runtime verification is still pending.
+- No public deployment has occurred.
+- Real production environment configuration is not yet complete.
+- The first Closed Beta deployment must use exactly one Node.js application instance.
+- Restarting the service resets in-memory daily quota; multiple instances would not share quota or concurrency state. Horizontal scaling is not supported in this version.
 
 ## 12. Current Product Decisions
 
@@ -201,17 +262,18 @@ These missing controls must be assessed before public accessibility.
 
 ## 13. Next Immediate Goal
 
-Complete closed beta launch security audit and necessary fixes, then deploy for a closed test with the first 5–10 users.
+**Phase 3C — First Closed Beta Deployment: NOT STARTED.**
+
+Phase 3B local production-like verification and stable commit creation are complete. Phase 3C must not begin without explicit deployment authorization and platform-specific runtime configuration review.
 
 ## 14. Next Steps
 
 ### P0
 
-1. Run a closed-beta security audit before making the application publicly accessible.
-2. Recheck repository history and deployment configuration for Secret exposure.
-3. Assess and implement the minimum closed-beta access protection.
-4. Assess rate limiting, daily quota, and concurrency controls against provider cost and abuse risk.
-5. Prepare a secure deployment configuration and environment-variable setup.
+1. Preserve the verified stable Closed Beta commit.
+2. Confirm the Phase 3C deployment platform and runtime topology.
+3. Configure platform Secrets and HTTPS without placing values in Git.
+4. Perform a final deployment-specific review before public accessibility.
 
 ### P1
 

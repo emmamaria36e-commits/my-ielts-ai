@@ -5,7 +5,7 @@
   "description": "AI-powered IELTS listening practice MVP",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check server/promptBuilder.js && node --check js/generator.js && node --check js/player.js && node --check js/services/aiService.js && node --check js/services/apiProvider.js && node --check js/services/mockProvider.js && node --check js/services/promptBuilder.js && node --check js/services/speechService.js && node --check js/services/wordParser.js",
+    "check": "node --check server.js && node --check server/promptBuilder.js && node --check server/costProtection.js && node --check server/runtimeConfig.js && node --check js/generator.js && node --check js/player.js && node --check js/services/betaAccess.js && node --check js/services/aiService.js && node --check js/services/apiProvider.js && node --check js/services/mockProvider.js && node --check js/services/promptBuilder.js && node --check js/services/speechService.js && node --check js/services/wordParser.js",
     "test": "node --test test/passageValidation.test.js"
   },
   "engines": {

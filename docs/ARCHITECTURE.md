@@ -9,6 +9,8 @@
 ```text
 server.js                    静态资源、受保护的模型 API 和 Speech API
 server/promptBuilder.js      服务端可信 Prompt
+server/costProtection.js     单实例内存额度与并发保护
+server/runtimeConfig.js      有界数字配置与 proxy hop 解析
 index.html
 ├─ css/                      页面模块样式
 └─ js/
@@ -40,10 +42,15 @@ Browser
 ```text
 Browser
   → APIProvider
+  → X-Beta-Invite from tab-scoped sessionStorage
+  → Node validates the invite and derives an anonymous invite identifier
   → POST /api/generate with words, Section, Voice and difficulty
-  → Node validates input and builds a Section-specific prompt
+  → AI kill switch → existing IP rate limit → input validation
+  → per-invite/global daily quota → per-invite/global concurrency slot → charge one request quota
+  → Node builds a Section-specific prompt
   → external model API with server-only credentials
   → a failed first result triggers one focused repair or fresh regeneration within a two-call ceiling
+  → finally release the concurrency slot
   → Node returns the normalized result
 ```
 
@@ -52,15 +59,27 @@ Browser
 ```text
 Browser
   → SpeechService
+  → X-Beta-Invite from tab-scoped sessionStorage
+  → Node validates the invite and derives an anonymous invite identifier
   → POST /api/speech with validated passage text and one trusted voice key
-  → Node validates text and maps the voice key to an Azure voice
+  → Speech kill switch → existing IP rate limit → input validation
+  → per-invite/global daily quota → per-invite/global concurrency slot → charge one request quota
+  → Node maps the voice key to an Azure voice
   → Azure Speech with server-only credentials and escaped SSML
   → wait up to 90 seconds; retry once only when Azure explicitly returns HTTP 502
+  → finally release the concurrency slot
   → Node returns MP3 audio
   → existing player loads a temporary browser object URL
 ```
 
 浏览器不再保存密钥、上游地址或 Authorization Header。Node 只公开首页、`css/`、`js/`、`assets/` 和明确的 API 路由，不公开服务端文件或 `.env`。
+
+### Health and Client Address
+
+- `GET /health` 返回且只返回 `{ "ok": true }`，不要求邀请码，不经过额度、并发或 Provider 流程。旧 `/api/health` 路径保留兼容，但返回相同的极简响应。
+- 短期限流规则仍为 AI 与 Speech 各自每地址 60 秒最多 20 次，没有改变窗口、阈值或两类请求分离方式。
+- `TRUST_PROXY_HOPS=0` 时只使用 socket remote address，完全忽略 `X-Forwarded-For`。
+- `TRUST_PROXY_HOPS` 只有在配置为 1–10 的十进制整数时才信任对应数量的最近代理 hop；非法、负数、小数或异常值回退为 0。不得在未确认真实代理拓扑前增加该值。
 
 ## Completed P0 Foundation
 
@@ -83,7 +102,18 @@ Browser
 ## Remaining P0 Risks
 
 1. 当前语音为一次性实时生成，不包含缓存或持久化。
-2. 两次模型调用预算控制成本，但不能保证每次生成最终成功；终态失败保留严格校验并允许用户重新发起。
+2. 每日额度和并发状态只存在于单个 Node 进程内存；重启会重置每日计数，多实例之间不共享状态。
+3. 短期限流已支持固定 proxy hop 解析，但部署时仍必须根据真实代理拓扑验证 `TRUST_PROXY_HOPS`；错误地增加该值会改变限流身份边界。
+
+## Closed Beta Deployment Constraint
+
+当前 Closed Beta 第一版只支持 **单个 Node.js application instance**：
+
+- 每日 quota 和 concurrency 状态只保存在当前 Node 进程内存中。
+- 服务重启会重置当日 quota 和所有活动状态。
+- 多实例之间不会共享 quota，也不会共享 concurrency。
+- 当前版本不支持 horizontal scaling；不得在负载均衡后启动多个应用实例并假定保护状态仍然全局有效。
+- 持久化 quota、Redis、数据库和多实例共享状态属于未来可能方案，当前没有实现，也不是 Phase 3A 的解决范围。
 
 ## Current Validated Text Flow
 
@@ -131,6 +161,9 @@ Browser
 - 模型返回的 JSON 必须经过结构和业务规则验证。真实 API 路径已经实现。
 - 展示层默认使用纯文本节点，不直接渲染模型 HTML。该边界已经实现。
 - 浏览器不能指定 Azure voice name、区域或上游地址，只能提交一个受支持的产品 voice key。
+- `/api/generate` 和 `/api/speech` 在限流、输入处理和供应商调用前验证 `X-Beta-Invite`；服务端启动时从 `BETA_INVITE_CODES` 构建 SHA-256 摘要集合，不把邀请码原文写入源码、响应或日志。验证成功后只在内部使用 16 字符匿名摘要 ID，为后续额度与并发控制预留身份边界。
+- 两个付费接口复用 anonymous invite ID 执行独立的每日额度与并发控制；全站额度和并发也按 AI/Speech 分离。只有在输入已验证、所有 quota 检查通过且成功获得 invite/global slot 后才同步扣减一次额度。Provider 内部第二次尝试不重复扣减。
+- `AI_ENABLED` 与 `SPEECH_ENABLED` 只有明确值 `true` 时启用；缺失或非法配置 fail safe 为关闭。所有 slot 在 provider 成功、失败、超时或响应异常时通过 `finally` 释放。
 - Speech 正文视为不可信数据；服务端拒绝 HTML，并在构造 SSML 前执行 XML 转义。
 - Mock 与真实 Provider 必须满足相同的成功结果契约。该契约已经通过自动测试统一验证。
 

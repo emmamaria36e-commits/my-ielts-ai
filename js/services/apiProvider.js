@@ -30,7 +30,7 @@
    * @returns {Promise<Object>}
    */
   function generate(p) {
-    return fetch('/api/generate', {
+    return window.BetaAccess.fetch('/api/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -52,7 +52,9 @@
               var message = payload && payload.error && payload.error.message
                 ? payload.error.message
                 : 'Passage generation failed.';
-              throw new Error(message);
+              var requestError = new Error(message);
+              requestError.status = response.status;
+              throw requestError;
             }
             return validatePayload(payload);
           });

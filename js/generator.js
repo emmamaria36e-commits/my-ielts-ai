@@ -300,7 +300,16 @@
 
         // Keep any previous successful result visible and avoid exposing
         // provider/validation details in the transcript area.
-        setTagInputStatus('本次暂未生成成功，请再次点击 Generate。', 'error');
+        setTagInputStatus(
+          error && error.status === 403
+            ? '测试邀请码无效或已失效，请重新输入。'
+            : error && error.status === 429
+              ? '请求过于频繁或今日测试额度已用完，请稍后再试。'
+              : error && error.status === 503
+                ? '该功能暂时不可用，请稍后再试。'
+            : '本次暂未生成成功，请再次点击 Generate。',
+          'error'
+        );
       });
   });
 

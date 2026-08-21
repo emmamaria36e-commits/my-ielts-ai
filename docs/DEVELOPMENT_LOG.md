@@ -100,4 +100,35 @@
 - **Real benchmark:** 使用相同 12 个天文学目标词、Section 4、Medium 连续执行 10 次：首次成功 5 次，最终成功 10 次，平均调用 1.5 次，平均耗时约 5.54 秒；4 次通过 Repair 恢复，1 次通过 Regenerate 恢复。
 - **Observed limitation:** 模型仍可能不严格遵守建议长度；本轮按确认范围只优化首次目标词覆盖率，未增加长度硬校验或调整 Repair 阈值。
 
+## DEV-010 — Phase 1 Invite Access
+
+- **Date:** 2026-08-11
+- **Implementation:** 在当前工作树中为 `/api/generate` 和 `/api/speech` 增加服务端邀请码验证；验证成功后使用不可逆摘要生成 anonymous invite ID。前端仅在 sessionStorage 保存会话邀请码、自动添加请求 Header，并在 403 后允许重新输入。
+- **Validation:** 阶段完成时 45 项测试通过。
+- **Git / deployment:** 已包含在当前稳定 HEAD；未 push，未部署。
+
+## DEV-011 — Phase 2 Cost Protection
+
+- **Date:** 2026-08-11
+- **Implementation:** 在当前工作树中增加 AI/Speech 分离的 per-invite 与 global 每日额度、per-invite 与 global 并发限制，以及 fail-safe AI/Speech kill switches。
+- **Quota semantics:** 仅在邀请码、开关、短期限流、输入、额度与并发检查均通过后，每个用户请求扣减一次；DeepSeek 内部恢复调用和 Azure retry 不重复扣减，slot 始终在 `finally` 释放。
+- **Validation:** 阶段完成时 70 项测试通过，0 项失败。
+- **Limitation:** 额度和并发状态仅存于单个进程内存，重启会重置，多实例不共享。
+- **Git / deployment:** 已包含在当前稳定 HEAD；未 push，未部署。
+
+## DEV-012 — AGENTS Context Recovery Minimal Patch
+
+- **Date:** 2026-08-19
+- **Implementation:** 最小补充跨会话上下文恢复、项目状态 Source of Truth、既有决策保护、`PROJECT_STATE.md` 维护及部署和破坏性 Git 操作边界。
+- **Scope:** 仅修改协作规则，没有修改业务代码。
+- **Git / deployment:** 已包含在当前稳定 HEAD；未 push，未部署。
+
+## DEV-013 — Phase 3A Deployment Readiness and Phase 3B Local Verification
+
+- **Date:** 2026-08-21
+- **Phase 3A:** 增加有界数字配置解析、固定 proxy hop 客户端地址识别和极简 `/health`；明确单 Node 实例及内存 quota/concurrency 限制。
+- **Phase 3B validation:** 77 项测试通过，0 项失败，`npm run check` 通过；health、无效邀请码、AI/Speech kill switch、一次真实 Generate 和一次真实 Speech smoke test 全部通过。
+- **Security audit:** `.env` 保持 Git 忽略；当前配置的 Secret 值在待提交源码和文档中的匹配数为 0；没有临时文件、缓存、真实邀请码或意外删除。
+- **Git / deployment:** Phase 1–3B 与协作文档已形成单个稳定 commit；未 push，未部署。
+
 后续只在完成重要里程碑或开发阶段发生明显变化时新增记录。

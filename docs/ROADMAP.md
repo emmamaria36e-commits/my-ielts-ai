@@ -2,7 +2,20 @@
 
 本文只记录已经确认的开发顺序和明确暂缓的事项。实现状态以代码和 Git 历史为准。
 
-## Current Milestone — P0 MVP Foundation
+## Current Stage — Context and Deployment Readiness
+
+| Sequence | Work | Status |
+|---|---|---|
+| 1 | MVP core pipeline | Completed |
+| 2 | Generation and Speech stability work | Completed |
+| 3 | Phase 1 — Invite Access | Implemented and tested locally; not deployed |
+| 4 | Phase 2 — Cost Protection | Implemented and tested locally; not deployed |
+| 5 | Context and documentation reconciliation | Completed |
+| 6 | Phase 3A — Deployment Readiness & Runtime Configuration | Completed locally; not deployed |
+| 7 | Phase 3B — Local Production-Like Verification & Stable Commit | Completed; not pushed or deployed |
+| 8 | Phase 3C — First Closed Beta Deployment | Next; not started |
+
+## Historical Milestone — P0 MVP Foundation
 
 | Step | Work | Status | Completion condition |
 |---|---|---|---|

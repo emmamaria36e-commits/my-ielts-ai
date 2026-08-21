@@ -13,11 +13,18 @@ const {
   buildSpeechSsml,
   chooseRecoveryAction,
   containsTargetWord,
+  createBetaInviteRegistry,
+  createCostProtection,
+  createServer,
   escapeXml,
+  getClientAddress,
+  identifyBetaInvite,
   inspectPassage,
   parseModelContent,
+  parseTrustProxyHops,
   requestPassage,
   requestSpeech,
+  readCostProtectionConfig,
   stripSpeakerLabels,
   validateGenerateRequest,
   validateModelResult,
@@ -36,6 +43,320 @@ const validPassage = [
   'We will also consider why sustainable development matters to future communities.',
 ].join(' ');
 
+const BETA_TEST_INVITE = 'closed-beta-test-invite';
+const BETA_TEST_INVITE_TWO = 'closed-beta-test-invite-two';
+const BETA_TEST_INVITE_THREE = 'closed-beta-test-invite-three';
+
+function createTestCostConfig(overrides = {}) {
+  return {
+    ai: {
+      enabled: true,
+      perInviteDailyLimit: 50,
+      globalDailyLimit: 100,
+      globalConcurrency: 3,
+      ...(overrides.ai || {}),
+    },
+    speech: {
+      enabled: true,
+      perInviteDailyLimit: 50,
+      globalDailyLimit: 100,
+      globalConcurrency: 3,
+      ...(overrides.speech || {}),
+    },
+  };
+}
+
+async function withBetaAccessServer(callback, options = {}) {
+  const costConfig = options.costConfig || createTestCostConfig();
+  const server = createServer({
+    betaInviteRegistry: createBetaInviteRegistry(
+      options.inviteCodes || [BETA_TEST_INVITE, BETA_TEST_INVITE_TWO, BETA_TEST_INVITE_THREE].join(',')
+    ),
+    costConfig,
+    costProtection: options.costProtection,
+    requestPassage: options.requestPassage,
+    requestSpeech: options.requestSpeech,
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    await callback(server.address().port);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+function postApi(port, pathname, invite, body = {}) {
+  return new Promise((resolve, reject) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (invite !== undefined) headers['X-Beta-Invite'] = invite;
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port,
+      path: pathname,
+      method: 'POST',
+      headers,
+    }, (response) => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => { body += chunk; });
+      response.on('end', () => {
+        const isJson = String(response.headers['content-type'] || '').includes('application/json');
+        resolve({
+          status: response.statusCode,
+          payload: body && isJson ? JSON.parse(body) : null,
+          body,
+        });
+      });
+    });
+    request.on('error', reject);
+    request.end(JSON.stringify(body));
+  });
+}
+
+function getApi(port, pathname, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port,
+      path: pathname,
+      method: 'GET',
+      headers,
+    }, (response) => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => { body += chunk; });
+      response.on('end', () => {
+        resolve({
+          status: response.statusCode,
+          payload: JSON.parse(body),
+        });
+      });
+    });
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+function validGenerateBody() {
+  return {
+    words: ['environment'],
+    section: 'section-4',
+    voices: ['british-female'],
+    difficulty: 'medium',
+  };
+}
+
+function validSpeechBody() {
+  return { text: validPassage, voice: 'british-female' };
+}
+
+function successfulPassage() {
+  return {
+    title: 'Test passage',
+    passage: validPassage,
+    targetWords: ['environment'],
+    metadata: { attempts: 1 },
+  };
+}
+
+function waitFor(predicate) {
+  return new Promise((resolve, reject) => {
+    let remaining = 100;
+    function check() {
+      if (predicate()) return resolve();
+      remaining -= 1;
+      if (!remaining) return reject(new Error('Timed out waiting for test condition.'));
+      setImmediate(check);
+    }
+    check();
+  });
+}
+
+function getTestInviteId(invite = BETA_TEST_INVITE) {
+  return identifyBetaInvite({ headers: { 'x-beta-invite': invite } }, createBetaInviteRegistry(invite)).id;
+}
+
+test('health endpoint succeeds without a beta invite and returns only ok', async () => {
+  await withBetaAccessServer(async (port) => {
+    const result = await getApi(port, '/health');
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.payload, { ok: true });
+  });
+});
+
+test('health endpoint does not consume quota or acquire concurrency', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await getApi(port, '/health')).status, 200);
+    assert.deepEqual(protection.inspect('ai', getTestInviteId()), {
+      day: protection.inspect('ai', getTestInviteId()).day,
+      inviteDaily: 0,
+      globalDaily: 0,
+      inviteActive: false,
+      globalActive: 0,
+    });
+    assert.equal(protection.inspect('speech', getTestInviteId()).globalDaily, 0);
+  }, { costConfig: config, costProtection: protection });
+});
+
+test('health endpoint does not call AI or Speech providers', async () => {
+  let aiCalls = 0;
+  let speechCalls = 0;
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await getApi(port, '/health')).status, 200);
+    assert.equal(aiCalls, 0);
+    assert.equal(speechCalls, 0);
+  }, {
+    requestPassage: async () => { aiCalls += 1; return successfulPassage(); },
+    requestSpeech: async () => { speechCalls += 1; return Buffer.from('audio'); },
+  });
+});
+
+test('legacy health path also returns no configuration details', async () => {
+  await withBetaAccessServer(async (port) => {
+    const result = await getApi(port, '/api/health');
+    assert.deepEqual(result.payload, { ok: true });
+    assert.equal(Object.hasOwn(result.payload, 'aiConfigured'), false);
+    assert.equal(Object.hasOwn(result.payload, 'speechConfigured'), false);
+  });
+});
+
+test('invalid proxy hop configuration falls back to trusting no proxy', () => {
+  for (const value of [undefined, '', 'yes', '-1', '1.5', '11', '999999999']) {
+    assert.equal(parseTrustProxyHops(value), 0);
+  }
+
+  const request = {
+    headers: { 'x-forwarded-for': '203.0.113.10' },
+    socket: { remoteAddress: '127.0.0.1' },
+  };
+  assert.equal(getClientAddress(request, parseTrustProxyHops('invalid')), '127.0.0.1');
+});
+
+test('trusted proxy hops select only the configured position from the right', () => {
+  const request = {
+    headers: { 'x-forwarded-for': '192.0.2.50, 198.51.100.25' },
+    socket: { remoteAddress: '127.0.0.1' },
+  };
+  assert.equal(getClientAddress(request, 0), '127.0.0.1');
+  assert.equal(getClientAddress(request, 1), '198.51.100.25');
+  assert.equal(getClientAddress(request, 2), '192.0.2.50');
+});
+
+test('generate endpoint rejects a missing beta invite', async () => {
+  await withBetaAccessServer(async (port) => {
+    const result = await postApi(port, '/api/generate');
+    assert.equal(result.status, 403);
+    assert.equal(result.payload.error.message, '测试邀请码无效或已失效，请重新输入。');
+  });
+});
+
+test('generate endpoint rejects an invalid beta invite', async () => {
+  await withBetaAccessServer(async (port) => {
+    const result = await postApi(port, '/api/generate', 'incorrect-invite');
+    assert.equal(result.status, 403);
+    assert.equal(result.payload.error.code, 'BETA_ACCESS_DENIED');
+  });
+});
+
+test('generate endpoint with a valid invite reaches existing request validation', async () => {
+  await withBetaAccessServer(async (port) => {
+    const result = await postApi(port, '/api/generate', BETA_TEST_INVITE);
+    assert.equal(result.status, 400);
+    assert.match(result.payload.error.message, /target words/);
+  });
+});
+
+test('speech endpoint rejects a missing beta invite', async () => {
+  await withBetaAccessServer(async (port) => {
+    const result = await postApi(port, '/api/speech');
+    assert.equal(result.status, 403);
+    assert.equal(result.payload.error.message, '测试邀请码无效或已失效，请重新输入。');
+  });
+});
+
+test('speech endpoint rejects an invalid beta invite', async () => {
+  await withBetaAccessServer(async (port) => {
+    const result = await postApi(port, '/api/speech', 'incorrect-invite');
+    assert.equal(result.status, 403);
+    assert.equal(result.payload.error.code, 'BETA_ACCESS_DENIED');
+  });
+});
+
+test('speech endpoint with a valid invite reaches existing request validation', async () => {
+  await withBetaAccessServer(async (port) => {
+    const result = await postApi(port, '/api/speech', BETA_TEST_INVITE);
+    assert.equal(result.status, 400);
+    assert.match(result.payload.error.message, /Speech text/);
+  });
+});
+
+test('validated invite identity is anonymous and the registry does not retain plaintext', () => {
+  const registry = createBetaInviteRegistry(` ${BETA_TEST_INVITE}, second-test-invite `);
+  const identity = identifyBetaInvite({
+    headers: { 'x-beta-invite': BETA_TEST_INVITE },
+  }, registry);
+
+  assert.equal(typeof identity.id, 'string');
+  assert.equal(identity.id.length, 16);
+  assert.notEqual(identity.id, BETA_TEST_INVITE);
+  assert.equal(JSON.stringify(Array.from(registry.entries())).includes(BETA_TEST_INVITE), false);
+});
+
+test('frontend sources contain no configured beta invite value', () => {
+  const frontendFiles = [
+    'index.html',
+    'js/generator.js',
+    'js/services/betaAccess.js',
+    'js/services/apiProvider.js',
+    'js/services/speechService.js',
+  ];
+  const frontendSource = frontendFiles
+    .map((file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8'))
+    .join('\n');
+  const configuredInvites = String(process.env.BETA_INVITE_CODES || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  assert.equal(frontendSource.includes(BETA_TEST_INVITE), false);
+  assert.equal(
+    configuredInvites.some((invite) => frontendSource.includes(invite)),
+    false,
+    'Frontend source must not contain a configured beta invite.'
+  );
+});
+
+test('beta invite rejection does not print invite plaintext to logs', async () => {
+  const attemptedInvite = 'invite-that-must-not-be-logged';
+  const captured = [];
+  const original = {
+    error: console.error,
+    info: console.info,
+    log: console.log,
+    warn: console.warn,
+  };
+  Object.keys(original).forEach((method) => {
+    console[method] = function () {
+      captured.push(Array.from(arguments).map(String).join(' '));
+    };
+  });
+
+  try {
+    await withBetaAccessServer(async (port) => {
+      const result = await postApi(port, '/api/generate', attemptedInvite);
+      assert.equal(result.status, 403);
+    });
+  } finally {
+    Object.keys(original).forEach((method) => {
+      console[method] = original[method];
+    });
+  }
+
+  assert.equal(captured.some((line) => line.includes(attemptedInvite)), false);
+});
+
 function loadMockProvider() {
   const sourcePath = path.join(__dirname, '..', 'js', 'services', 'mockProvider.js');
   const source = fs.readFileSync(sourcePath, 'utf8');
@@ -50,6 +371,461 @@ function loadMockProvider() {
   vm.runInNewContext(source, sandbox, { filename: sourcePath });
   return browserWindow.MockAIProvider;
 }
+
+function loadBetaAccess(options = {}) {
+  const sourcePath = path.join(__dirname, '..', 'js', 'services', 'betaAccess.js');
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  const storage = new Map(Object.entries(options.storage || {}));
+  const requests = [];
+  const prompts = (options.prompts || []).slice();
+  const responses = (options.responses || [{ status: 200 }]).slice();
+  const alerts = [];
+  const browserWindow = {
+    alert: (message) => alerts.push(message),
+    fetch: (url, requestOptions) => {
+      requests.push({ url, options: requestOptions });
+      return Promise.resolve(responses.shift() || { status: 200 });
+    },
+    prompt: () => prompts.shift() ?? null,
+    sessionStorage: {
+      getItem: (key) => storage.get(key) || null,
+      removeItem: (key) => storage.delete(key),
+      setItem: (key, value) => storage.set(key, value),
+    },
+  };
+  const sandbox = { window: browserWindow, Promise, Error, Object };
+  vm.runInNewContext(source, sandbox, { filename: sourcePath });
+  return { alerts, requests, storage, BetaAccess: browserWindow.BetaAccess };
+}
+
+test('frontend stores the first invite in sessionStorage and sends the beta header', async () => {
+  const browser = loadBetaAccess({ prompts: [' first-session-invite '] });
+  const response = await browser.BetaAccess.fetch('/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(browser.requests[0].options.headers['X-Beta-Invite'], 'first-session-invite');
+  assert.equal(browser.storage.get('my-ielts-ai-beta-invite'), 'first-session-invite');
+});
+
+test('frontend clears a rejected invite and retries once with a replacement', async () => {
+  const browser = loadBetaAccess({
+    storage: { 'my-ielts-ai-beta-invite': 'expired-session-invite' },
+    prompts: ['replacement-session-invite'],
+    responses: [{ status: 403 }, { status: 200 }],
+  });
+  const response = await browser.BetaAccess.fetch('/api/speech', { method: 'POST' });
+
+  assert.equal(response.status, 200);
+  assert.equal(browser.requests.length, 2);
+  assert.equal(browser.requests[0].options.headers['X-Beta-Invite'], 'expired-session-invite');
+  assert.equal(browser.requests[1].options.headers['X-Beta-Invite'], 'replacement-session-invite');
+  assert.deepEqual(browser.alerts, ['测试邀请码无效或已失效，请重新输入。']);
+  assert.equal(browser.storage.get('my-ielts-ai-beta-invite'), 'replacement-session-invite');
+});
+
+test('per-invite AI daily quota rejects before another provider call', async () => {
+  const config = createTestCostConfig({ ai: { perInviteDailyLimit: 1 } });
+  const protection = createCostProtection(config);
+  let providerCalls = 0;
+  await withBetaAccessServer(async (port) => {
+    const first = await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody());
+    const second = await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody());
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 429);
+    assert.equal(providerCalls, 1);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestPassage: async () => { providerCalls += 1; return successfulPassage(); },
+  });
+});
+
+test('per-invite Speech daily quota rejects before another provider call', async () => {
+  const config = createTestCostConfig({ speech: { perInviteDailyLimit: 1 } });
+  const protection = createCostProtection(config);
+  let providerCalls = 0;
+  await withBetaAccessServer(async (port) => {
+    const first = await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody());
+    const second = await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody());
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 429);
+    assert.equal(providerCalls, 1);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestSpeech: async () => { providerCalls += 1; return Buffer.from('audio'); },
+  });
+});
+
+test('global AI daily quota rejects a different invite before provider call', async () => {
+  const config = createTestCostConfig({ ai: { globalDailyLimit: 1 } });
+  const protection = createCostProtection(config);
+  let providerCalls = 0;
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody())).status, 200);
+    assert.equal((await postApi(port, '/api/generate', BETA_TEST_INVITE_TWO, validGenerateBody())).status, 429);
+    assert.equal(providerCalls, 1);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestPassage: async () => { providerCalls += 1; return successfulPassage(); },
+  });
+});
+
+test('global Speech daily quota rejects a different invite before provider call', async () => {
+  const config = createTestCostConfig({ speech: { globalDailyLimit: 1 } });
+  const protection = createCostProtection(config);
+  let providerCalls = 0;
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody())).status, 200);
+    assert.equal((await postApi(port, '/api/speech', BETA_TEST_INVITE_TWO, validSpeechBody())).status, 429);
+    assert.equal(providerCalls, 1);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestSpeech: async () => { providerCalls += 1; return Buffer.from('audio'); },
+  });
+});
+
+test('same invite second AI request is rejected while the first is active', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  let providerCalls = 0;
+  let finish;
+  await withBetaAccessServer(async (port) => {
+    const firstRequest = postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody());
+    await waitFor(() => providerCalls === 1);
+    const second = await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody());
+    assert.equal(second.status, 429);
+    finish(successfulPassage());
+    assert.equal((await firstRequest).status, 200);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestPassage: () => { providerCalls += 1; return new Promise((resolve) => { finish = resolve; }); },
+  });
+});
+
+test('same invite second Speech request is rejected while the first is active', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  let providerCalls = 0;
+  let finish;
+  await withBetaAccessServer(async (port) => {
+    const firstRequest = postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody());
+    await waitFor(() => providerCalls === 1);
+    const second = await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody());
+    assert.equal(second.status, 429);
+    finish(Buffer.from('audio'));
+    assert.equal((await firstRequest).status, 200);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestSpeech: () => { providerCalls += 1; return new Promise((resolve) => { finish = resolve; }); },
+  });
+});
+
+test('global AI concurrency rejects another invite immediately', async () => {
+  const config = createTestCostConfig({ ai: { globalConcurrency: 1 } });
+  const protection = createCostProtection(config);
+  let providerCalls = 0;
+  let finish;
+  await withBetaAccessServer(async (port) => {
+    const firstRequest = postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody());
+    await waitFor(() => providerCalls === 1);
+    const second = await postApi(port, '/api/generate', BETA_TEST_INVITE_TWO, validGenerateBody());
+    assert.equal(second.status, 429);
+    assert.equal(providerCalls, 1);
+    assert.equal(protection.inspect('ai', getTestInviteId(BETA_TEST_INVITE_TWO)).inviteDaily, 0);
+    finish(successfulPassage());
+    await firstRequest;
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestPassage: () => { providerCalls += 1; return new Promise((resolve) => { finish = resolve; }); },
+  });
+});
+
+test('global Speech concurrency rejects another invite immediately', async () => {
+  const config = createTestCostConfig({ speech: { globalConcurrency: 1 } });
+  const protection = createCostProtection(config);
+  let providerCalls = 0;
+  let finish;
+  await withBetaAccessServer(async (port) => {
+    const firstRequest = postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody());
+    await waitFor(() => providerCalls === 1);
+    const second = await postApi(port, '/api/speech', BETA_TEST_INVITE_TWO, validSpeechBody());
+    assert.equal(second.status, 429);
+    assert.equal(providerCalls, 1);
+    assert.equal(protection.inspect('speech', getTestInviteId(BETA_TEST_INVITE_TWO)).inviteDaily, 0);
+    finish(Buffer.from('audio'));
+    await firstRequest;
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestSpeech: () => { providerCalls += 1; return new Promise((resolve) => { finish = resolve; }); },
+  });
+});
+
+test('AI kill switch returns 503 with zero DeepSeek calls', async () => {
+  const config = createTestCostConfig({ ai: { enabled: false } });
+  let providerCalls = 0;
+  await withBetaAccessServer(async (port) => {
+    const result = await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody());
+    assert.equal(result.status, 503);
+    assert.equal(providerCalls, 0);
+  }, {
+    costConfig: config,
+    requestPassage: async () => { providerCalls += 1; return successfulPassage(); },
+  });
+});
+
+test('Speech kill switch returns 503 with zero Azure calls', async () => {
+  const config = createTestCostConfig({ speech: { enabled: false } });
+  let providerCalls = 0;
+  await withBetaAccessServer(async (port) => {
+    const result = await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody());
+    assert.equal(result.status, 503);
+    assert.equal(providerCalls, 0);
+  }, {
+    costConfig: config,
+    requestSpeech: async () => { providerCalls += 1; return Buffer.from('audio'); },
+  });
+});
+
+async function assertTwoAttemptGenerateChargesOnce(recoveryAction) {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  let providerAttempts = 0;
+  await withBetaAccessServer(async (port) => {
+    const result = await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody());
+    assert.equal(result.status, 200);
+    assert.equal(providerAttempts, 2);
+    assert.equal(protection.inspect('ai', getTestInviteId()).inviteDaily, 1);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestPassage: async () => {
+      providerAttempts += 2;
+      return { ...successfulPassage(), metadata: { attempts: 2, recoveryAction } };
+    },
+  });
+}
+
+test('Generate Initial plus Repair consumes one user quota', async () => {
+  await assertTwoAttemptGenerateChargesOnce('repair');
+});
+
+test('Generate Initial plus Regenerate consumes one user quota', async () => {
+  await assertTwoAttemptGenerateChargesOnce('regenerate');
+});
+
+test('Speech provider retry consumes one user quota', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  let providerAttempts = 0;
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody())).status, 200);
+    assert.equal(providerAttempts, 2);
+    assert.equal(protection.inspect('speech', getTestInviteId()).inviteDaily, 1);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestSpeech: async () => { providerAttempts += 2; return Buffer.from('audio'); },
+  });
+});
+
+test('concurrency rejection does not consume another quota', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  let started = false;
+  let finish;
+  await withBetaAccessServer(async (port) => {
+    const firstRequest = postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody());
+    await waitFor(() => started);
+    assert.equal((await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody())).status, 429);
+    assert.equal(protection.inspect('ai', getTestInviteId()).inviteDaily, 1);
+    finish(successfulPassage());
+    await firstRequest;
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestPassage: () => { started = true; return new Promise((resolve) => { finish = resolve; }); },
+  });
+});
+
+test('kill switch rejection does not consume quota', async () => {
+  const config = createTestCostConfig({ ai: { enabled: false } });
+  const protection = createCostProtection(config);
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody())).status, 503);
+    assert.equal(protection.inspect('ai', getTestInviteId()).inviteDaily, 0);
+  }, { costConfig: config, costProtection: protection });
+});
+
+test('invalid invite rejection does not consume quota', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await postApi(port, '/api/generate', 'invalid-invite', validGenerateBody())).status, 403);
+    assert.equal(protection.inspect('ai', getTestInviteId()).globalDaily, 0);
+  }, { costConfig: config, costProtection: protection });
+});
+
+test('provider throw releases the AI concurrency slot', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  let calls = 0;
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody())).status, 500);
+    assert.equal(protection.inspect('ai', getTestInviteId()).inviteActive, false);
+    assert.equal((await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody())).status, 200);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestPassage: async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('test provider failure');
+      return successfulPassage();
+    },
+  });
+});
+
+test('provider error releases the Speech concurrency slot', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  let calls = 0;
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody())).status, 500);
+    assert.equal(protection.inspect('speech', getTestInviteId()).inviteActive, false);
+    assert.equal((await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody())).status, 200);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestSpeech: async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('test provider failure');
+      return Buffer.from('audio');
+    },
+  });
+});
+
+test('Repair or Regenerate completion releases the AI slot', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody())).status, 200);
+    assert.equal(protection.inspect('ai', getTestInviteId()).inviteActive, false);
+    assert.equal((await postApi(port, '/api/generate', BETA_TEST_INVITE, validGenerateBody())).status, 200);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestPassage: async () => ({ ...successfulPassage(), metadata: { attempts: 2, recoveryAction: 'repair' } }),
+  });
+});
+
+test('Azure retry completion releases the Speech slot', async () => {
+  const config = createTestCostConfig();
+  const protection = createCostProtection(config);
+  await withBetaAccessServer(async (port) => {
+    assert.equal((await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody())).status, 200);
+    assert.equal(protection.inspect('speech', getTestInviteId()).inviteActive, false);
+    assert.equal((await postApi(port, '/api/speech', BETA_TEST_INVITE, validSpeechBody())).status, 200);
+  }, {
+    costConfig: config,
+    costProtection: protection,
+    requestSpeech: async () => Buffer.from('audio'),
+  });
+});
+
+test('frontend does not automatically retry a 429 response', async () => {
+  const browser = loadBetaAccess({
+    storage: { 'my-ielts-ai-beta-invite': 'session-invite' },
+    responses: [{ status: 429 }],
+  });
+  assert.equal((await browser.BetaAccess.fetch('/api/generate')).status, 429);
+  assert.equal(browser.requests.length, 1);
+  assert.equal(browser.alerts.length, 0);
+});
+
+test('frontend does not automatically retry a 503 response', async () => {
+  const browser = loadBetaAccess({
+    storage: { 'my-ielts-ai-beta-invite': 'session-invite' },
+    responses: [{ status: 503 }],
+  });
+  assert.equal((await browser.BetaAccess.fetch('/api/speech')).status, 503);
+  assert.equal(browser.requests.length, 1);
+  assert.equal(browser.alerts.length, 0);
+});
+
+test('frontend retries 403 at most once', async () => {
+  const browser = loadBetaAccess({
+    storage: { 'my-ielts-ai-beta-invite': 'expired-invite' },
+    prompts: ['replacement-invite', 'must-not-be-requested'],
+    responses: [{ status: 403 }, { status: 403 }],
+  });
+  assert.equal((await browser.BetaAccess.fetch('/api/generate')).status, 403);
+  assert.equal(browser.requests.length, 2);
+  assert.equal(browser.alerts.length, 2);
+  assert.equal(browser.storage.has('my-ielts-ai-beta-invite'), false);
+});
+
+test('daily quota resets on the next server-local calendar day', () => {
+  let current = new Date(2026, 7, 11, 23, 59, 0);
+  const config = createTestCostConfig({ ai: { perInviteDailyLimit: 1 } });
+  const protection = createCostProtection(config, { now: () => current });
+  const first = protection.acquire('ai', 'anonymous-id');
+  assert.equal(first.ok, true);
+  first.release();
+  assert.equal(protection.acquire('ai', 'anonymous-id').status, 429);
+  current = new Date(2026, 7, 12, 0, 1, 0);
+  const nextDay = protection.acquire('ai', 'anonymous-id');
+  assert.equal(nextDay.ok, true);
+  nextDay.release();
+});
+
+test('kill switches fail safe unless explicitly true', () => {
+  const absent = readCostProtectionConfig({});
+  const invalid = readCostProtectionConfig({ AI_ENABLED: 'yes', SPEECH_ENABLED: '1' });
+  const enabled = readCostProtectionConfig({ AI_ENABLED: 'true', SPEECH_ENABLED: 'TRUE' });
+  assert.equal(absent.ai.enabled, false);
+  assert.equal(absent.speech.enabled, false);
+  assert.equal(invalid.ai.enabled, false);
+  assert.equal(invalid.speech.enabled, false);
+  assert.equal(enabled.ai.enabled, true);
+  assert.equal(enabled.speech.enabled, true);
+});
+
+test('invalid numeric protection config falls back to finite safe defaults', () => {
+  const config = readCostProtectionConfig({
+    AI_ENABLED: 'true',
+    SPEECH_ENABLED: 'true',
+    AI_GENERATE_DAILY_LIMIT: 'NaN',
+    SPEECH_DAILY_LIMIT: '0',
+    GLOBAL_AI_DAILY_LIMIT: '-1',
+    GLOBAL_SPEECH_DAILY_LIMIT: '1.5',
+    GLOBAL_AI_CONCURRENCY: 'not-a-number',
+    GLOBAL_SPEECH_CONCURRENCY: '999999999',
+  });
+
+  assert.equal(config.ai.perInviteDailyLimit, 15);
+  assert.equal(config.speech.perInviteDailyLimit, 20);
+  assert.equal(config.ai.globalDailyLimit, 100);
+  assert.equal(config.speech.globalDailyLimit, 150);
+  assert.equal(config.ai.globalConcurrency, 3);
+  assert.equal(config.speech.globalConcurrency, 3);
+  for (const policy of [config.ai, config.speech]) {
+    assert.equal(Number.isSafeInteger(policy.perInviteDailyLimit), true);
+    assert.equal(Number.isSafeInteger(policy.globalDailyLimit), true);
+    assert.equal(Number.isSafeInteger(policy.globalConcurrency), true);
+    assert.equal(policy.perInviteDailyLimit > 0, true);
+    assert.equal(policy.globalDailyLimit > 0, true);
+    assert.equal(policy.globalConcurrency > 0, true);
+  }
+});
 
 test('request validation normalizes target-word whitespace', () => {
   const result = validateGenerateRequest({

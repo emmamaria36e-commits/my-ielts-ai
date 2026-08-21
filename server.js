@@ -2,9 +2,12 @@
 
 const http = require('http');
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
-const { randomUUID } = require('crypto');
+const { createHash, randomUUID, timingSafeEqual } = require('crypto');
 const { buildPrompt, buildRepairPrompt } = require('./server/promptBuilder');
+const { createCostProtection, readCostProtectionConfig } = require('./server/costProtection');
+const { parseTrustProxyHops } = require('./server/runtimeConfig');
 
 const ROOT = __dirname;
 const ENV_FILE = path.join(ROOT, '.env');
@@ -67,6 +70,8 @@ const SPEECH_VOICES = {
 const WORD_PATTERN = /^[A-Za-z][A-Za-z' -]*$/;
 const aiRateLimitEntries = new Map();
 const speechRateLimitEntries = new Map();
+const BETA_INVITE_HEADER = 'x-beta-invite';
+const BETA_INVITE_MAX_LENGTH = 256;
 
 const STATIC_DIRECTORIES = {
   '/css/': path.join(ROOT, 'css'),
@@ -123,6 +128,64 @@ function createHttpError(status, message) {
   const error = new Error(message);
   error.status = status;
   return error;
+}
+
+function hashBetaInvite(value) {
+  return createHash('sha256').update(value, 'utf8').digest();
+}
+
+function createBetaInviteRegistry(rawValue) {
+  const hashes = new Map();
+  String(rawValue || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .forEach((value) => {
+      const digest = hashBetaInvite(value);
+      const digestHex = digest.toString('hex');
+      hashes.set(digestHex, {
+        digest,
+        id: digestHex.slice(0, 16),
+      });
+    });
+  return hashes;
+}
+
+function identifyBetaInvite(request, registry) {
+  const supplied = request.headers[BETA_INVITE_HEADER];
+  if (typeof supplied !== 'string') return null;
+
+  const invite = supplied.trim();
+  if (!invite || invite.length > BETA_INVITE_MAX_LENGTH) return null;
+
+  const candidate = hashBetaInvite(invite);
+  for (const entry of registry.values()) {
+    if (timingSafeEqual(candidate, entry.digest)) {
+      return { id: entry.id };
+    }
+  }
+  return null;
+}
+
+function sendBetaInviteDenied(response) {
+  sendJson(response, 403, {
+    error: {
+      code: 'BETA_ACCESS_DENIED',
+      message: '测试邀请码无效或已失效，请重新输入。',
+    },
+  });
+}
+
+function sendCostProtectionDenied(response, decision) {
+  const isDisabled = decision.status === 503;
+  sendJson(response, decision.status, {
+    error: {
+      code: isDisabled ? 'FEATURE_TEMPORARILY_DISABLED' : 'COST_LIMIT_REACHED',
+      message: isDisabled
+        ? '该功能暂时不可用，请稍后再试。'
+        : '请求过于频繁或今日测试额度已用完，请稍后再试。',
+    },
+  });
 }
 
 function readJsonBody(request) {
@@ -247,6 +310,24 @@ function isRateLimited(entries, address) {
 
   current.count += 1;
   return current.count > RATE_LIMIT_MAX;
+}
+
+function getClientAddress(request, trustProxyHops = 0) {
+  const remoteAddress = request.socket.remoteAddress || 'unknown';
+  if (trustProxyHops === 0) return remoteAddress;
+
+  const forwardedHeader = request.headers['x-forwarded-for'];
+  if (typeof forwardedHeader !== 'string') return remoteAddress;
+
+  const forwardedAddresses = forwardedHeader
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const addressIndex = forwardedAddresses.length - trustProxyHops;
+  if (addressIndex < 0) return remoteAddress;
+
+  const candidate = forwardedAddresses[addressIndex];
+  return net.isIP(candidate) ? candidate : remoteAddress;
 }
 
 function removeExpiredRateLimits(entries) {
@@ -810,7 +891,7 @@ function resolveStaticFile(pathname) {
   return null;
 }
 
-async function handleRequest(request, response) {
+async function handleRequest(request, response, context) {
   const baseUrl = `http://${request.headers.host || 'localhost'}`;
   let pathname;
   try {
@@ -820,18 +901,24 @@ async function handleRequest(request, response) {
     return;
   }
 
-  if (request.method === 'GET' && pathname === '/api/health') {
-    const speechConfig = getSpeechConfig();
-    sendJson(response, 200, {
-      status: 'ok',
-      aiConfigured: Boolean(getAiConfig().apiKey),
-      speechConfigured: Boolean(speechConfig.key && speechConfig.region),
-    });
+  if (request.method === 'GET' && (pathname === '/health' || pathname === '/api/health')) {
+    sendJson(response, 200, { ok: true });
     return;
   }
 
   if (request.method === 'POST' && pathname === '/api/generate') {
-    const address = request.socket.remoteAddress || 'unknown';
+    const inviteIdentity = identifyBetaInvite(request, context.betaInviteRegistry);
+    if (!inviteIdentity) {
+      sendBetaInviteDenied(response);
+      return;
+    }
+
+    if (!context.costConfig.ai.enabled) {
+      sendCostProtectionDenied(response, { status: 503 });
+      return;
+    }
+
+    const address = getClientAddress(request, context.trustProxyHops);
     if (isRateLimited(aiRateLimitEntries, address)) {
       sendJson(response, 429, { error: { message: 'Too many requests. Please try again shortly.' } });
       return;
@@ -840,8 +927,17 @@ async function handleRequest(request, response) {
     try {
       const input = await readJsonBody(request);
       const params = validateGenerateRequest(input);
-      const result = await requestPassage(params);
-      sendJson(response, 200, result);
+      const lease = context.costProtection.acquire('ai', inviteIdentity.id);
+      if (!lease.ok) {
+        sendCostProtectionDenied(response, lease);
+        return;
+      }
+      try {
+        const result = await context.requestPassage(params);
+        sendJson(response, 200, result);
+      } finally {
+        lease.release();
+      }
     } catch (error) {
       const status = Number.isInteger(error.status) ? error.status : 500;
       if (status >= 500 && status !== 503 && status !== 504) {
@@ -867,7 +963,18 @@ async function handleRequest(request, response) {
   }
 
   if (request.method === 'POST' && pathname === '/api/speech') {
-    const address = request.socket.remoteAddress || 'unknown';
+    const inviteIdentity = identifyBetaInvite(request, context.betaInviteRegistry);
+    if (!inviteIdentity) {
+      sendBetaInviteDenied(response);
+      return;
+    }
+
+    if (!context.costConfig.speech.enabled) {
+      sendCostProtectionDenied(response, { status: 503 });
+      return;
+    }
+
+    const address = getClientAddress(request, context.trustProxyHops);
     if (isRateLimited(speechRateLimitEntries, address)) {
       sendJson(response, 429, { error: { message: 'Too many requests. Please try again shortly.' } });
       return;
@@ -876,8 +983,17 @@ async function handleRequest(request, response) {
     try {
       const input = await readJsonBody(request);
       const params = validateSpeechRequest(input);
-      const audio = await requestSpeech(params);
-      sendAudio(response, audio);
+      const lease = context.costProtection.acquire('speech', inviteIdentity.id);
+      if (!lease.ok) {
+        sendCostProtectionDenied(response, lease);
+        return;
+      }
+      try {
+        const audio = await context.requestSpeech(params);
+        sendAudio(response, audio);
+      } finally {
+        lease.release();
+      }
     } catch (error) {
       const status = Number.isInteger(error.status) ? error.status : 500;
       if (status >= 500 && status !== 503 && status !== 504) {
@@ -908,9 +1024,24 @@ async function handleRequest(request, response) {
   sendJson(response, 404, { error: { message: 'Not found.' } });
 }
 
-function createServer() {
+function createServer(options = {}) {
+  const betaInviteRegistry = options.betaInviteRegistry
+    || createBetaInviteRegistry(process.env.BETA_INVITE_CODES || '');
+  const costConfig = options.costConfig || readCostProtectionConfig(process.env);
+  const costProtection = options.costProtection || createCostProtection(costConfig);
+  const trustProxyHops = options.trustProxyHops === undefined
+    ? parseTrustProxyHops(process.env.TRUST_PROXY_HOPS)
+    : options.trustProxyHops;
+  const context = {
+    betaInviteRegistry,
+    costConfig,
+    costProtection,
+    trustProxyHops,
+    requestPassage: options.requestPassage || requestPassage,
+    requestSpeech: options.requestSpeech || requestSpeech,
+  };
   return http.createServer((request, response) => {
-    handleRequest(request, response).catch((error) => {
+    handleRequest(request, response, context).catch((error) => {
       console.error('[Server] Unhandled request error:', error.message);
       if (!response.headersSent) {
         sendJson(response, 500, { error: { message: 'Unexpected server error.' } });
@@ -930,14 +1061,20 @@ if (require.main === module) {
 
 module.exports = {
   buildSpeechSsml,
+  createBetaInviteRegistry,
+  createCostProtection,
   createServer,
   chooseRecoveryAction,
   containsTargetWord,
   escapeXml,
+  getClientAddress,
   inspectPassage,
+  identifyBetaInvite,
   parseModelContent,
+  parseTrustProxyHops,
   requestPassage,
   requestSpeech,
+  readCostProtectionConfig,
   stripSpeakerLabels,
   validateGenerateRequest,
   validateModelResult,
