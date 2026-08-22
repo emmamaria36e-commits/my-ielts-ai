@@ -624,6 +624,7 @@ async function requestPassage(params, options = {}) {
   let repairContext = null;
   let recoveryAction = 'none';
   let initialMissingCount = 0;
+  let firstAttemptFailureType = null;
 
   emitGenerationLog(options.logger, {
     event: 'generation_started',
@@ -644,6 +645,9 @@ async function requestPassage(params, options = {}) {
         repairContext
       );
       const inspection = inspectPassage(upstreamResult.candidate, params);
+      if (attempt === 1 && !inspection.valid) {
+        firstAttemptFailureType = inspection.failureType;
+      }
       const action = chooseRecoveryAction(inspection, attempt, params.words.length);
 
       emitGenerationLog(options.logger, {
@@ -670,6 +674,7 @@ async function requestPassage(params, options = {}) {
           section: params.section,
           targetWordCount: params.words.length,
           firstAttemptMissingCount: initialMissingCount,
+          firstAttemptFailureType,
           recoveryAction,
           success: true,
           totalAttempts: attempt,
@@ -753,6 +758,7 @@ async function requestPassage(params, options = {}) {
         section: params.section,
         targetWordCount: params.words.length,
         firstAttemptMissingCount: initialMissingCount,
+        firstAttemptFailureType,
         recoveryAction,
         success: false,
         totalAttempts: attempt,

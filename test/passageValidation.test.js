@@ -1039,6 +1039,7 @@ test('small missing set uses one focused repair within a two-call budget', async
     assert.equal(JSON.stringify(logs).includes('biodiversity'), false);
     assert.deepEqual(Object.keys(stats[0]).sort(), [
       'durationMs',
+      'firstAttemptFailureType',
       'firstAttemptMissingCount',
       'recoveryAction',
       'section',
@@ -1046,9 +1047,53 @@ test('small missing set uses one focused repair within a two-call budget', async
       'targetWordCount',
       'totalAttempts',
     ]);
+    assert.equal(stats[0].firstAttemptFailureType, 'missing-target-words');
     assert.equal(stats[0].firstAttemptMissingCount, 2);
     assert.equal(stats[0].success, true);
     assert.equal(JSON.stringify(stats).includes('biodiversity'), false);
+  });
+});
+
+test('generation stats record a non-missing first-attempt failure type', async () => {
+  const stats = [];
+  await withMockAiServer((attempt, request, response) => {
+    sendModelResult(response, attempt === 1
+      ? { title: 'Too short', passage: 'Brief.' }
+      : { title: 'Regenerated', passage: completePipelinePassage });
+  }, async (requests) => {
+    const result = await requestPassage(pipelineParams, {
+      logger: function () {},
+      statsWriter: (event) => stats.push(event),
+    });
+    assert.equal(requests.length, 2);
+    assert.equal(result.metadata.recoveryAction, 'regenerate');
+    assert.equal(stats[0].firstAttemptFailureType, 'invalid-passage-length');
+    assert.equal(stats[0].firstAttemptMissingCount, 0);
+    assert.equal(stats[0].success, true);
+  });
+});
+
+test('second-attempt failure does not overwrite firstAttemptFailureType', async () => {
+  const stats = [];
+  await withMockAiServer((attempt, request, response) => {
+    sendModelResult(response, attempt === 1
+      ? { title: 'Too short', passage: 'Brief.' }
+      : {
+          title: 'Still incomplete',
+          passage: 'This environment report provides enough introductory material for a listening passage.',
+        });
+  }, async (requests) => {
+    await assert.rejects(
+      requestPassage(pipelineParams, {
+        logger: function () {},
+        statsWriter: (event) => stats.push(event),
+      }),
+      /every target word/
+    );
+    assert.equal(requests.length, 2);
+    assert.equal(stats[0].firstAttemptFailureType, 'invalid-passage-length');
+    assert.equal(stats[0].success, false);
+    assert.equal(stats[0].totalAttempts, 2);
   });
 });
 
