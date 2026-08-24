@@ -28,27 +28,138 @@
        NAVBAR
        ======================================== -->
   <nav class="navbar" role="navigation" aria-label="Main navigation">
-    <a href="/" class="navbar__logo" aria-label="My IELTS AI Home">
-      <span class="navbar__logo-icon">🎧</span>
-      My IELTS <span class="navbar__logo-accent">AI</span>
-    </a>
+    <a href="/" class="navbar__logo" aria-label="Listening Home">LISTENING</a>
 
     <div class="navbar__links">
       <a href="#generator" class="navbar__link">AI 听力</a>
       <a href="#how-it-works" class="navbar__link">学习流程</a>
     </div>
 
-    <a href="#" class="navbar__cta">登录</a>
-
-    <button class="navbar__menu-btn" aria-label="Toggle menu">
-      ☰
-    </button>
   </nav>
 
   <!-- ========================================
        HERO
        ======================================== -->
-  <section class="hero" aria-labelledby="hero-title">
+  <section class="hero" aria-labelledby="hero-editorial-title">
+    <svg class="hero__paper-grain" aria-hidden="true">
+      <filter id="paper-grain" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.72 0.31" numOctaves="3" seed="17" stitchTiles="stitch" />
+        <feColorMatrix type="saturate" values="0" />
+        <feComponentTransfer>
+          <feFuncA type="table" tableValues="0 0.09" />
+        </feComponentTransfer>
+      </filter>
+      <rect width="100%" height="100%" filter="url(#paper-grain)" />
+    </svg>
+    <svg class="hero__contours" viewBox="0 0 1440 760" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <filter id="contour-roughness" x="-4%" y="-4%" width="108%" height="108%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.028" numOctaves="2" seed="9" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.2" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+      <g fill="none" stroke="currentColor" stroke-linecap="round" filter="url(#contour-roughness)">
+        <path d="M-70 128C93 40 246 65 333 158c86 92 64 202 167 250 124 58 235-63 347-3 98 53 75 171 188 207 109 35 220-60 322-3 62 35 88 101 157 117" />
+        <path d="M-42 164C89 91 219 91 293 171c78 84 55 187 154 235 114 56 223-50 324 4 94 50 72 160 178 199 104 38 214-49 310 4 66 36 90 97 153 113" />
+        <path d="M20 204c101-55 199-50 257 14 67 74 46 158 132 205 102 55 198-31 288 16 83 44 65 139 158 180 94 41 190-27 278 17 55 28 83 75 127 94" />
+        <path d="M1007-32c-71 82-46 175 34 208 96 39 182-48 267 0 71 40 68 123 139 159" />
+        <path d="M1050-19c-50 66-31 133 30 159 78 34 151-36 220 1 57 30 62 92 114 123" />
+        <path d="M-45 626c124-73 225-50 273 23 41 62 12 122 54 166" />
+      </g>
+    </svg>
+
+    <div class="hero__editorial">
+      <div class="hero__editorial-copy">
+        <h1 id="hero-editorial-title" class="hero__editorial-title">
+          <span>You know<br class="hero__mobile-break hero__mobile-break--title"> the word.</span>
+          <span class="hero__title-question">But do your ears?</span>
+        </h1>
+      </div>
+
+      <a href="#generator" class="hero__editorial-cta">Start listening <span aria-hidden="true">→</span></a>
+
+      <div class="hero__art" aria-hidden="true">
+        <svg class="hero__ink-wave" viewBox="0 0 640 360" role="presentation">
+          <defs>
+            <filter id="ink-edge" x="-3%" y="-5%" width="106%" height="110%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.028 0.11" numOctaves="2" seed="23" result="inkNoise" />
+              <feDisplacementMap in="SourceGraphic" in2="inkNoise" scale="1.45" xChannelSelector="R" yChannelSelector="B" />
+            </filter>
+          </defs>
+          <g hidden>
+            <path opacity=".86" d="M16 179l7-2 2 2-2 3-7 1-2-2zm21 0 11-2 2 2-3 3-10 1-2-2zm25 1 13-3 2 2-3 4-12 1-2-2zm28 0 14-2 2 3-4 2-12 1-2-2zm32 1 11-3 3 2-3 4-11 0-2-2zm31-1 15-2 2 3-4 3-13 0-2-2zm33 1 13-3 2 2-3 4-12 0-2-2zm35 0 10-2 3 2-3 3-10 1-2-2zm30 0 15-3 2 3-4 3-13 0-2-2zm34 0 11-2 3 2-3 4-11 0-2-2zm33 0 16-3 2 3-4 3-14 0-2-2zm36 0 11-2 3 3-3 3-11-1-2-2zm33 0 13-3 3 2-3 4-13 0-2-2zm34 1 15-3 2 2-3 4-14 0-2-2zm36 0 10-3 3 2-3 4-10 0-2-2zm32 0 14-3 2 3-4 3-12 0-2-2zm34 0 12-2 3 2-4 3-11 0-2-2zm32 0 9-2 3 2-3 3-9 1-2-2zm28 0 7-2 2 2-2 3-7 0-2-2z" />
+            <path opacity=".58" d="M56 167c3-1 6 0 8 2l-2 3-7-1-2-2zm-6 13 9-2 2 2-3 4-8 0-2-2zm8 12 6-2 2 2-2 3-6 1-2-2z" />
+            <path opacity=".74" d="M93 150l10-1 2 3-3 3-10-1-2-2zm-7 14 7-2 2 2-2 3-7 1-2-2zm12-1 6-1 2 2-2 3-6 0-2-2zm-5 15 17-2 3 3-4 4-16-1-2-2zm-5 14 10-2 2 2-2 4-10 0-2-2zm8 15 8-2 2 2-2 3-8 1-2-2z" />
+            <path opacity=".86" d="M165 126l8-1 2 3-3 3-8-1-2-2zm-8 15 12-3 3 3-4 4-11 0-2-2zm17-1 5-1 2 2-2 3-5 0-2-2zm-10 16 11-2 2 3-3 3-10 0-2-2zm-10 17 15-3 3 3-4 4-14 0-2-2zm20-1 6-1 2 2-2 3-6 0-2-2zm-12 15 13-2 3 3-4 4-12-1-2-2zm-10 17 9-3 3 2-3 4-9 1-2-2zm14-1 8-2 2 3-3 3-7 0-2-2zm-7 18 13-3 3 3-4 4-12 0-2-2zm6 14 7-2 2 2-2 3-7 1-2-2z" />
+            <path opacity=".72" d="M204 153l11-3 3 3-4 4-10 0-2-2zm-6 16 7-2 2 2-2 3-7 1-2-2zm4 20 12-3 3 3-4 4-11 0-2-2zm3 17 9-1 2 3-3 3-8-1-2-2z" />
+            <path opacity=".83" d="M239 140l9-2 3 3-3 4-9-1-2-2zm-7 16 12-3 3 3-4 4-11 0-2-2zm16-1 5-1 2 2-2 3-5 0-2-2zm-8 17 9-2 3 3-3 3-9 0-2-2zm-9 16 15-3 3 3-4 4-14 0-2-2zm20-1 4-1 2 2-2 3-4 0-2-2zm-12 18 13-3 3 3-4 4-12 0-2-2zm6 15 8-2 2 3-3 3-8-1-2-2z" />
+            <path opacity=".96" d="M273 118l9-2 3 3-3 4-9 0-2-2zm-9 16 15-3 3 3-4 4-14 0-2-2zm20-1 5-1 2 2-2 3-5 0-2-2zm-11 16 12-2 3 3-4 4-11-1-2-2zm-11 17 13-3 3 3-4 4-12 0-2-2zm18-1 7-2 3 3-3 3-7 0-2-2zm-13 17 18-3 3 3-4 4-17 0-2-2zm22-1 4-1 2 2-2 3-4 0-2-2zm-17 18 12-3 3 3-4 4-11 0-2-2zm-8 17 8-3 3 3-3 4-8 0-2-2zm13-2 9-1 2 3-3 3-8-1-2-2zm-6 17 11-3 3 3-4 4-10 0-2-2z" />
+            <path opacity=".67" d="M312 159l10-3 3 3-4 4-9 0-2-2zm-6 17 18-3 3 3-4 4-17 0-2-2zm6 15 12-1 3 3-3 4-12-2-2-2zm-5 16 9-3 3 3-3 4-9 0-2-2z" />
+            <path opacity=".82" d="M341 142l11-2 3 3-4 4-10-1-2-2zm-6 16 10-3 3 3-4 4-9 0-2-2zm14-1 5-1 2 2-2 3-5 0-2-2zm-7 17 10-2 3 3-4 3-9 0-2-2zm-11 17 16-3 3 3-4 4-15 0-2-2zm21-1 4-1 2 2-2 3-4 0-2-2zm-12 18 12-3 3 3-4 4-11 0-2-2zm5 14 8-1 2 3-3 3-7-1-2-2z" />
+            <path opacity=".93" d="M378 113l8-2 3 3-3 4-8 0-2-2zm-8 16 13-3 3 3-4 4-12 0-2-2zm18-1 5-1 2 2-2 3-5 0-2-2zm-10 17 11-2 3 3-4 4-10-1-2-2zm-11 16 16-3 3 3-4 4-15 0-2-2zm21-1 6-1 2 2-2 3-6 0-2-2zm-12 17 12-2 3 3-3 4-12-1-2-2zm-9 19 13-3 3 3-4 4-12 0-2-2zm18-1 4-1 2 2-2 3-4 0-2-2zm-11 16 15-3 3 3-4 4-14 0-2-2zm20-1 5-1 2 2-2 3-5 0-2-2zm-13 17 12-2 3 3-4 3-11 0-2-2zm5 14 8-1 2 3-3 3-7-1-2-2z" />
+            <path opacity=".68" d="M415 150l13-3 3 3-4 4-12 0-2-2zm-6 18 10-2 3 3-4 4-9-1-2-2zm4 17 19-3 3 3-4 4-18 0-2-2zm4 19 12-3 3 3-4 4-11 0-2-2z" />
+            <path opacity=".81" d="M448 136l9-2 3 3-3 4-9 0-2-2zm-7 16 12-3 3 3-4 4-11 0-2-2zm16-1 4-1 2 2-2 3-4 0-2-2zm-9 18 12-3 3 3-4 4-11 0-2-2zm-9 16 14-2 3 3-4 4-13-1-2-2zm19 0 6-1 2 2-2 3-6 0-2-2zm-10 18 12-3 3 3-4 4-11 0-2-2zm6 15 8-2 2 3-3 3-7-1-2-2z" />
+            <path opacity=".91" d="M483 121l10-2 3 3-4 4-9-1-2-2zm-8 16 14-3 3 3-4 4-13 0-2-2zm19-1 5-1 2 2-2 3-5 0-2-2zm-11 17 14-2 3 3-4 4-13-1-2-2zm-9 16 12-3 3 3-4 4-11 0-2-2zm17-1 4-1 2 2-2 3-4 0-2-2zm-12 18 17-3 3 3-4 4-16 0-2-2zm22-1 5-1 2 2-2 3-5 0-2-2zm-16 17 12-2 3 3-3 4-12-1-2-2zm-8 17 13-3 3 3-4 4-12 0-2-2zm18-1 4-1 2 2-2 3-4 0-2-2zm-11 16 11-2 3 3-4 4-10-1-2-2z" />
+            <path opacity=".66" d="M522 157l11-3 3 3-4 4-10 0-2-2zm-5 17 18-3 3 3-4 4-17 0-2-2zm6 16 13-2 3 3-4 4-12-1-2-2zm-4 16 10-2 3 3-3 4-10-1-2-2z" />
+            <path opacity=".82" d="M552 133l9-2 3 3-3 4-9 0-2-2zm-7 17 12-3 3 3-4 4-11 0-2-2zm17-1 4-1 2 2-2 3-4 0-2-2zm-10 17 13-2 3 3-4 4-12-1-2-2zm-9 17 15-3 3 3-4 4-14 0-2-2zm21-1 5-1 2 2-2 3-5 0-2-2zm-13 18 13-3 3 3-4 4-12 0-2-2zm6 16 12-2 3 3-4 4-11-1-2-2z" />
+            <path opacity=".68" d="M586 148l8-2 3 3-3 4-8-1-2-2zm-7 17 11-3 3 3-4 4-10 0-2-2zm16-1 4-1 2 2-2 3-4 0-2-2zm-9 16 11-2 3 3-3 4-11-1-2-2zm-7 18 9-3 3 3-3 4-9 0-2-2zm6 14 8-2 2 3-3 3-7 0-2-2z" />
+            <path opacity=".5" d="M613 167l7-2 2 2-2 3-7 1-2-2zm-5 13 8-2 2 2-2 3-8 1-2-2zm12 0 4-1 2 2-2 2-4 0-1-1zm-7 14 7-2 2 2-2 3-7 1-2-2zm12-16 6-1 2 2-2 3-6 0-2-2zm9 0 4-1 2 2-2 2-4 0-1-1z" />
+          </g>
+          <g hidden>
+            <circle cx="27" cy="176" r="1.1" /><circle cx="43" cy="184" r=".8" /><circle cx="72" cy="201" r="1.4" /><circle cx="106" cy="143" r="1.5" />
+            <circle cx="146" cy="212" r="1.2" /><circle cx="181" cy="119" r="1.6" /><circle cx="219" cy="185" r="1.2" />
+            <circle cx="251" cy="228" r="1.4" /><circle cx="289" cy="110" r="1.5" /><circle cx="325" cy="198" r="1.1" />
+            <circle cx="360" cy="132" r="1.3" /><circle cx="399" cy="221" r="1.5" /><circle cx="430" cy="158" r="1.1" />
+            <circle cx="467" cy="213" r="1.3" /><circle cx="502" cy="115" r="1.5" /><circle cx="537" cy="194" r="1.2" />
+            <circle cx="571" cy="126" r="1.4" /><circle cx="603" cy="205" r="1.2" /><circle cx="618" cy="185" r=".8" /><circle cx="628" cy="174" r=".75" /><circle cx="637" cy="181" r=".55" />
+          </g>
+          <g hidden>
+            <path opacity=".44" d="M25 178l4-1 2 2-1 3-5 0-1-2z" />
+            <path opacity=".58" d="M43 176l4-1 2 2-1 6-5 0-1-2z" />
+            <path opacity=".68" d="M62 173l5-1 2 2-1 12-6 0-1-3z" />
+            <path opacity=".76" d="M82 168l6-2 2 3-1 22-7 1-2-3z" />
+            <path opacity=".84" d="M103 159l7-2 2 3-1 40-7 2-2-4z" />
+            <path opacity=".91" d="M124 145l7-2 3 3-2 67-8 3-2-4z" />
+            <path opacity=".8" d="M145 163l7-2 3 3-2 34-8 1-2-4z" />
+            <path opacity=".93" d="M167 137l8-3 3 4-2 82-9 3-2-5z" />
+            <path opacity=".86" d="M190 153l7-2 3 3-2 53-8 2-2-4z" />
+            <path opacity=".96" d="M212 127l8-3 3 4-2 103-9 4-2-5z" />
+            <path opacity=".9" d="M236 142l8-2 3 4-2 75-9 3-2-5z" />
+            <path opacity=".97" d="M260 113l8-3 3 4-2 132-9 4-2-5z" />
+            <path opacity=".87" d="M284 149l7-2 3 3-2 60-8 2-2-4z" />
+            <path opacity=".92" d="M306 134l8-3 3 4-2 91-9 3-2-5z" />
+            <path opacity=".84" d="M329 155l7-2 3 3-2 48-8 2-2-4z" />
+            <path opacity=".98" d="M352 99l9-3 3 4-2 161-10 4-2-6z" />
+            <path opacity=".86" d="M377 148l7-2 3 3-2 63-8 3-2-5z" />
+            <path opacity=".94" d="M400 124l8-3 3 4-2 109-9 3-2-5z" />
+            <path opacity=".83" d="M424 153l7-2 3 3-2 54-8 2-2-4z" />
+            <path opacity=".91" d="M447 137l8-3 3 4-2 84-9 3-2-5z" />
+            <path opacity=".8" d="M471 158l7-2 3 3-2 43-8 2-2-4z" />
+            <path opacity=".87" d="M494 145l7-2 3 3-2 69-8 2-2-5z" />
+            <path opacity=".76" d="M517 164l6-2 3 3-2 31-7 2-2-4z" />
+            <path opacity=".82" d="M539 153l7-2 3 3-2 53-8 2-2-4z" />
+            <path opacity=".7" d="M562 169l6-2 2 3-1 23-7 1-2-3z" />
+            <path opacity=".64" d="M583 173l5-1 2 2-1 14-6 0-1-3z" />
+            <path opacity=".55" d="M603 176l4-1 2 2-1 8-5 0-1-2z" />
+            <path opacity=".43" d="M621 178l4-1 2 2-1 4-5 0-1-2z" />
+          </g>
+          <g class="hero__stroke-wave" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" filter="url(#ink-edge)">
+            <path d="M20 180H42
+              C47 180 47 174 47 169 C47 163 55 163 55 169 V187 C55 194 64 194 64 187 V156 C64 149 73 149 73 156 V176 C73 182 81 182 81 176 V166 C81 159 90 159 90 166 V190 C90 198 100 198 100 190 V146 C100 138 110 138 110 146 V178 C110 184 119 184 119 178 V157 C119 148 130 148 130 157 V205 C130 214 141 214 141 205 V132 C141 122 153 122 153 132 V178 C153 185 163 185 163 178 V145 C163 135 175 135 175 145 V219 C175 230 188 230 188 219 V113 C188 101 202 101 202 113 V178 C202 186 213 186 213 178 V139 C213 129 225 129 225 139 V212 C225 222 237 222 237 212 V151 C237 142 248 142 248 151 V177 C248 184 258 184 258 177 V137 C258 127 270 127 270 137 V194 C270 203 281 203 281 194 V158 C281 150 291 150 291 158 V178 C291 184 300 184 300 178 V148 C300 139 311 139 311 148 V239 C311 252 327 252 327 239 V101 C327 88 343 88 343 101 V178 C343 187 355 187 355 178 V136 C355 126 367 126 367 136 V215 C367 225 379 225 379 215 V151 C379 142 390 142 390 151 V178 C390 185 400 185 400 178 V140 C400 130 412 130 412 140 V201 C412 210 423 210 423 201 V157 C423 149 433 149 433 157 V178 C433 184 442 184 442 178 V150 C442 141 453 141 453 150 V195 C453 203 463 203 463 195 V163 C463 155 473 155 473 163 V179 C473 185 482 185 482 179 V154 C482 146 492 146 492 154 V193 C492 201 502 201 502 193 V165 C502 158 511 158 511 165 V179 C511 185 520 185 520 179 V159 C520 151 530 151 530 159 V198 C530 206 540 206 540 198 V169 C540 162 549 162 549 169 V181 C549 187 557 187 557 181 V166 C557 159 566 159 566 166 V190 C566 197 575 197 575 190 V173 C575 167 583 167 583 173 V181 C583 186 590 186 590 181 V170 C590 164 598 164 598 170 V183 C598 188 606 188 606 183 V178 C606 174 612 174 612 178 H630"
+              stroke-width="7.2" opacity=".93" />
+            <path d="M20 180H42
+              C47 180 47 174 47 169 C47 163 55 163 55 169 V187 C55 194 64 194 64 187 V156 C64 149 73 149 73 156 V176 C73 182 81 182 81 176 V166 C81 159 90 159 90 166 V190 C90 198 100 198 100 190 V146 C100 138 110 138 110 146 V178 C110 184 119 184 119 178 V157 C119 148 130 148 130 157 V205 C130 214 141 214 141 205 V132 C141 122 153 122 153 132 V178 C153 185 163 185 163 178 V145 C163 135 175 135 175 145 V219 C175 230 188 230 188 219 V113 C188 101 202 101 202 113 V178 C202 186 213 186 213 178 V139 C213 129 225 129 225 139 V212 C225 222 237 222 237 212 V151 C237 142 248 142 248 151 V177 C248 184 258 184 258 177 V137 C258 127 270 127 270 137 V194 C270 203 281 203 281 194 V158 C281 150 291 150 291 158 V178 C291 184 300 184 300 178 V148 C300 139 311 139 311 148 V239 C311 252 327 252 327 239 V101 C327 88 343 88 343 101 V178 C343 187 355 187 355 178 V136 C355 126 367 126 367 136 V215 C367 225 379 225 379 215 V151 C379 142 390 142 390 151 V178 C390 185 400 185 400 178 V140 C400 130 412 130 412 140 V201 C412 210 423 210 423 201 V157 C423 149 433 149 433 157 V178 C433 184 442 184 442 178 V150 C442 141 453 141 453 150 V195 C453 203 463 203 463 195 V163 C463 155 473 155 473 163 V179 C473 185 482 185 482 179 V154 C482 146 492 146 492 154 V193 C492 201 502 201 502 193 V165 C502 158 511 158 511 165 V179 C511 185 520 185 520 179 V159 C520 151 530 151 530 159 V198 C530 206 540 206 540 198 V169 C540 162 549 162 549 169 V181 C549 187 557 187 557 181 V166 C557 159 566 159 566 166 V190 C566 197 575 197 575 190 V173 C575 167 583 167 583 173 V181 C583 186 590 186 590 181 V170 C590 164 598 164 598 170 V183 C598 188 606 188 606 183 V178 C606 174 612 174 612 178 H630"
+              stroke-width="9.5" opacity=".13" />
+          </g>
+          <g hidden>
+            <circle cx="14" cy="180" r="1.1" /><circle cx="34" cy="181" r=".75" />
+            <circle cx="634" cy="180" r=".8" /><circle cx="642" cy="180" r=".55" />
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="hero__legacy" hidden>
 
     <!-- Background elements -->
     <div class="hero__grid"></div>
@@ -107,141 +218,164 @@
       <div class="hero__scroll-mouse"></div>
       <span>向下滚动</span>
     </div>
+    </div>
   </section>
 
   <!-- ========================================
        AI LISTENING GENERATOR
        ======================================== -->
   <section id="generator" class="generator-section" aria-labelledby="generator-title">
+    <svg class="generator__paper-grain" aria-hidden="true">
+      <filter id="generator-paper-grain" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.72 0.31" numOctaves="3" seed="17" stitchTiles="stitch" />
+        <feColorMatrix type="saturate" values="0" />
+        <feComponentTransfer>
+          <feFuncA type="table" tableValues="0 0.09" />
+        </feComponentTransfer>
+      </filter>
+      <rect width="100%" height="100%" filter="url(#generator-paper-grain)" />
+    </svg>
+    <svg class="generator__contours" viewBox="0 0 1440 760" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <filter id="generator-contour-roughness" x="-4%" y="-4%" width="108%" height="108%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.028" numOctaves="2" seed="9" result="generatorContourNoise" />
+          <feDisplacementMap in="SourceGraphic" in2="generatorContourNoise" scale="3.2" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+      <g fill="none" stroke="currentColor" stroke-linecap="round" filter="url(#generator-contour-roughness)">
+        <path d="M-70 128C93 40 246 65 333 158c86 92 64 202 167 250 124 58 235-63 347-3 98 53 75 171 188 207 109 35 220-60 322-3 62 35 88 101 157 117" />
+        <path d="M-42 164C89 91 219 91 293 171c78 84 55 187 154 235 114 56 223-50 324 4 94 50 72 160 178 199 104 38 214-49 310 4 66 36 90 97 153 113" />
+        <path d="M20 204c101-55 199-50 257 14 67 74 46 158 132 205 102 55 198-31 288 16 83 44 65 139 158 180 94 41 190-27 278 17 55 28 83 75 127 94" />
+        <path d="M1007-32c-71 82-46 175 34 208 96 39 182-48 267 0 71 40 68 123 139 159" />
+        <path d="M1050-19c-50 66-31 133 30 159 78 34 151-36 220 1 57 30 62 92 114 123" />
+        <path d="M-45 626c124-73 225-50 273 23 41 62 12 122 54 166" />
+      </g>
+    </svg>
 
     <div class="generator__header">
-      <h2 id="generator-title" class="generator__title">🎧 AI 听力生成器</h2>
-      <p class="generator__subtitle">输入单词，选择场景和声音，AI 为你生成雅思听力材料</p>
+      <p class="generator__kicker">GENERATOR</p>
+      <h2 id="generator-title" class="generator__title">Turn the words you know<br>into something you can hear.</h2>
     </div>
 
     <div class="generator-card">
 
       <!-- ===== Step 1: Word Input ===== -->
       <div class="generator__step">
-        <span class="generator__step-label">Step 1</span>
-        <h3 class="generator__step-title">📝 输入你今天想学的单词</h3>
+        <h3 class="generator__step-title"><span>01</span> — WORDS</h3>
         <div class="tag-input-wrapper" id="tagWrapper">
-          <input
-            type="text"
+          <span class="generator__ink-frame-asset" aria-hidden="true"></span>
+          <textarea
             class="tag-input"
             id="tagInput"
-            placeholder="输入词条后按回车，或粘贴逗号、分号、换行分隔的词表"
-            aria-label="输入单词"
-          >
+            rows="3"
+            placeholder="Enter words separated by commas or line breaks."
+            aria-label="Enter target words"
+          ></textarea>
         </div>
         <p class="tag-input-hint">
-          💡 支持逗号、分号、换行批量添加 · 普通空格会保留在短语中 · 最多 20 个词条
+          Tip: 10–20 words work best for natural dialogues.
         </p>
         <p class="tag-input-status" id="tagInputStatus" role="status" aria-live="polite"></p>
       </div>
 
-      <div class="generator__divider" aria-hidden="true"></div>
+      <div class="generator__divider generator__divider--ink-asset" aria-hidden="true">
+        <img src="assets/ink/ink-divider-line.png" alt="" draggable="false">
+      </div>
 
       <!-- ===== Step 2: IELTS Section Selection ===== -->
       <div class="generator__step">
-        <span class="generator__step-label">Step 2</span>
-        <h3 class="generator__step-title">🎯 选择 IELTS Listening Section</h3>
+        <h3 class="generator__step-title"><span>02</span> — LISTENING SECTION</h3>
         <div class="scene-cards">
           <div class="scene-card">
             <input type="radio" name="section" id="section-1" value="section-1" class="scene-card__input" checked>
             <label for="section-1" class="scene-card__label">
-              <span class="scene-card__icon">📞</span>
-              <span class="scene-card__name">Section 1<br>Everyday Conversation</span>
+              <span class="scene-card__number">01</span>
+              <span class="scene-card__name">Everyday<br>Conversation</span>
             </label>
           </div>
           <div class="scene-card">
             <input type="radio" name="section" id="section-2" value="section-2" class="scene-card__input">
             <label for="section-2" class="scene-card__label">
-              <span class="scene-card__icon">🗺️</span>
-              <span class="scene-card__name">Section 2<br>Social Monologue</span>
+              <span class="scene-card__number">02</span>
+              <span class="scene-card__name">Social<br>Monologue</span>
             </label>
           </div>
           <div class="scene-card">
             <input type="radio" name="section" id="section-3" value="section-3" class="scene-card__input">
             <label for="section-3" class="scene-card__label">
-              <span class="scene-card__icon">🎓</span>
-              <span class="scene-card__name">Section 3<br>Academic Discussion</span>
+              <span class="scene-card__number">03</span>
+              <span class="scene-card__name">Academic<br>Discussion</span>
             </label>
           </div>
           <div class="scene-card">
             <input type="radio" name="section" id="section-4" value="section-4" class="scene-card__input">
             <label for="section-4" class="scene-card__label">
-              <span class="scene-card__icon">🏛️</span>
-              <span class="scene-card__name">Section 4<br>Academic Lecture</span>
+              <span class="scene-card__number">04</span>
+              <span class="scene-card__name">Academic<br>Lecture</span>
             </label>
           </div>
         </div>
       </div>
 
-      <div class="generator__divider" aria-hidden="true"></div>
+      <div class="generator__divider generator__divider--ink-asset" aria-hidden="true">
+        <img src="assets/ink/ink-divider-line.png" alt="" draggable="false">
+      </div>
 
       <!-- ===== Step 3: Voice Selection ===== -->
       <div class="generator__step">
-        <span class="generator__step-label">Step 3</span>
-        <h3 class="generator__step-title">🎤 选择声音</h3>
+        <h3 class="generator__step-title"><span>03</span> — VOICE</h3>
         <div class="voice-cards">
           <div class="voice-card">
             <input type="radio" name="voice" id="voice-british-female" value="british-female" class="voice-card__input" checked>
             <label for="voice-british-female" class="voice-card__label">
-              <span class="voice-card__flag">🇬🇧</span>
+              <span class="voice-card__flag">GB</span>
               <span class="voice-card__info">
                 <span class="voice-card__name">British Female</span>
-                <span class="voice-card__desc">英音女声 · 清晰正式</span>
               </span>
-              <button class="voice-card__sample" aria-label="试听 British Female" title="试听样本">🔊</button>
             </label>
           </div>
           <div class="voice-card">
             <input type="radio" name="voice" id="voice-british-male" value="british-male" class="voice-card__input">
             <label for="voice-british-male" class="voice-card__label">
-              <span class="voice-card__flag">🇬🇧</span>
+              <span class="voice-card__flag">GB</span>
               <span class="voice-card__info">
                 <span class="voice-card__name">British Male</span>
-                <span class="voice-card__desc">英音男声 · 沉稳自然</span>
               </span>
-              <button class="voice-card__sample" aria-label="试听 British Male" title="试听样本">🔊</button>
             </label>
           </div>
           <div class="voice-card">
             <input type="radio" name="voice" id="voice-australian-female" value="australian-female" class="voice-card__input">
             <label for="voice-australian-female" class="voice-card__label">
-              <span class="voice-card__flag">🇦🇺</span>
+              <span class="voice-card__flag">AU</span>
               <span class="voice-card__info">
                 <span class="voice-card__name">Australian Female</span>
-                <span class="voice-card__desc">澳音女声 · 亲切自然</span>
               </span>
-              <button class="voice-card__sample" aria-label="试听 Australian Female" title="试听样本">🔊</button>
             </label>
           </div>
           <div class="voice-card">
             <input type="radio" name="voice" id="voice-american-female" value="american-female" class="voice-card__input">
             <label for="voice-american-female" class="voice-card__label">
-              <span class="voice-card__flag">🇺🇸</span>
+              <span class="voice-card__flag">US</span>
               <span class="voice-card__info">
                 <span class="voice-card__name">American Female</span>
-                <span class="voice-card__desc">美音女声 · 标准流畅</span>
               </span>
-              <button class="voice-card__sample" aria-label="试听 American Female" title="试听样本">🔊</button>
             </label>
           </div>
         </div>
 
       </div>
 
-      <div class="generator__divider" aria-hidden="true"></div>
+      <div class="generator__divider generator__divider--ink-asset" aria-hidden="true">
+        <img src="assets/ink/ink-divider-line.png" alt="" draggable="false">
+      </div>
 
       <!-- ===== Step 4: Generate Button ===== -->
       <div class="generator__step">
         <div class="generator__submit-wrapper">
           <button class="generator__submit" id="generateBtn" disabled>
             <span class="generator__submit-spinner" aria-hidden="true"></span>
-            <span class="generator__submit-text">✨ 生成我的听力材料</span>
-            <span class="generator__submit-icon">✨</span>
+            <span class="generator__submit-text">Generate listening material</span>
+            <span class="generator__submit-icon" aria-hidden="true">→</span>
           </button>
         </div>
       </div>
@@ -254,20 +388,35 @@
        ======================================== -->
   <section id="resultSection" class="result-section" aria-labelledby="result-title">
 
+    <svg class="generator__paper-grain" aria-hidden="true">
+      <rect width="100%" height="100%" filter="url(#generator-paper-grain)" />
+    </svg>
+    <svg class="generator__contours" viewBox="0 0 1440 760" preserveAspectRatio="none" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-linecap="round" filter="url(#generator-contour-roughness)">
+        <path d="M-70 128C93 40 246 65 333 158c86 92 64 202 167 250 124 58 235-63 347-3 98 53 75 171 188 207 109 35 220-60 322-3 62 35 88 101 157 117" />
+        <path d="M-42 164C89 91 219 91 293 171c78 84 55 187 154 235 114 56 223-50 324 4 94 50 72 160 178 199 104 38 214-49 310 4 66 36 90 97 153 113" />
+        <path d="M20 204c101-55 199-50 257 14 67 74 46 158 132 205 102 55 198-31 288 16 83 44 65 139 158 180 94 41 190-27 278 17 55 28 83 75 127 94" />
+        <path d="M1007-32c-71 82-46 175 34 208 96 39 182-48 267 0 71 40 68 123 139 159" />
+        <path d="M1050-19c-50 66-31 133 30 159 78 34 151-36 220 1 57 30 62 92 114 123" />
+        <path d="M-45 626c124-73 225-50 273 23 41 62 12 122 54 166" />
+      </g>
+    </svg>
+
     <div class="result-card">
 
       <!-- Header -->
       <div class="result-card__header">
-        <span class="result-card__header-icon">🎧</span>
-        <h2 id="result-title">你的听力材料</h2>
+        <span class="result-card__kicker">RESULT</span>
+        <h2 id="result-title">Understanding Ecosystem Resilience</h2>
       </div>
 
       <!-- ===== Audio Player ===== -->
-      <div class="audio-player" id="audioPlayer">
+      <div class="result-card__section result-card__section--audio">
+        <h3 class="result-card__section-label"><span>01</span> — AUDIO</h3>
+        <div class="audio-player" id="audioPlayer">
         <!-- Voice info -->
         <div class="audio-player__voice">
-          <span>当前声音：</span>
-          <span class="audio-player__voice-flag">🇬🇧</span>
+          <span class="audio-player__voice-flag">GB</span>
           <span class="audio-player__voice-label">British Female</span>
         </div>
         <div class="audio-player__status" id="audioStatus" role="status" aria-live="polite"></div>
@@ -309,10 +458,10 @@
 
             <!-- Skip -->
             <button class="audio-player__skip audio-player__skip-back" aria-label="后退 15 秒">
-              ⏪ 15s
+              « 15s
             </button>
             <button class="audio-player__skip audio-player__skip-fwd" aria-label="前进 15 秒">
-              15s ⏩
+              15s »
             </button>
           </div>
 
@@ -323,18 +472,30 @@
             <button class="audio-player__speed-btn" data-speed="1.25">1.25x</button>
           </div>
         </div>
+        </div>
       </div>
 
       <!-- ===== Transcript ===== -->
-      <div class="result-card__divider" aria-hidden="true"></div>
+      <div class="result-card__divider" aria-hidden="true">
+        <img src="assets/ink/ink-divider-line.png" alt="" draggable="false">
+      </div>
 
-      <div class="transcript">
-        <div class="transcript__title">📄 听力原文</div>
-        <div class="transcript__text" id="transcriptText">
-          <!-- Filled dynamically -->
+      <div class="result-card__section result-card__section--transcript">
+        <h3 class="result-card__section-label"><span>02</span> — TRANSCRIPT</h3>
+        <div class="transcript">
+          <div class="transcript__text" id="transcriptText">
+            <!-- Filled dynamically -->
+          </div>
         </div>
+      </div>
 
-        <!-- Target words -->
+      <div class="result-card__divider" aria-hidden="true">
+        <img src="assets/ink/ink-divider-line.png" alt="" draggable="false">
+      </div>
+
+      <!-- Target words -->
+      <div class="result-card__section result-card__section--target-words">
+        <h3 class="result-card__section-label"><span>03</span> — TARGET WORDS</h3>
         <div class="target-words" id="targetWords">
           <!-- Filled dynamically -->
         </div>
@@ -346,69 +507,31 @@
   <!-- ========================================
        HOW IT WORKS
        ======================================== -->
-  <section id="how-it-works" class="how-it-works" aria-labelledby="how-title">
-    <div class="how-it-works__header">
-      <h2 id="how-title" class="how-it-works__title">📋 三步开始学习</h2>
-      <p class="how-it-works__subtitle">从单词到听力，AI 让一切变得简单</p>
-    </div>
+  <section id="how-it-works" class="how-it-works hero" aria-labelledby="closing-title">
+    <svg class="generator__paper-grain" aria-hidden="true">
+      <rect width="100%" height="100%" filter="url(#generator-paper-grain)" />
+    </svg>
+    <svg class="generator__contours" viewBox="0 0 1440 760" preserveAspectRatio="none" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-linecap="round" filter="url(#generator-contour-roughness)">
+        <path d="M-70 128C93 40 246 65 333 158c86 92 64 202 167 250 124 58 235-63 347-3 98 53 75 171 188 207 109 35 220-60 322-3 62 35 88 101 157 117" />
+        <path d="M-42 164C89 91 219 91 293 171c78 84 55 187 154 235 114 56 223-50 324 4 94 50 72 160 178 199 104 38 214-49 310 4 66 36 90 97 153 113" />
+        <path d="M20 204c101-55 199-50 257 14 67 74 46 158 132 205 102 55 198-31 288 16 83 44 65 139 158 180 94 41 190-27 278 17 55 28 83 75 127 94" />
+        <path d="M1007-32c-71 82-46 175 34 208 96 39 182-48 267 0 71 40 68 123 139 159" />
+        <path d="M1050-19c-50 66-31 133 30 159 78 34 151-36 220 1 57 30 62 92 114 123" />
+        <path d="M-45 626c124-73 225-50 273 23 41 62 12 122 54 166" />
+      </g>
+    </svg>
 
-    <div class="how-it-works__steps">
-      <!-- Step 1 -->
-      <div class="how-it-works__step">
-        <div class="how-it-works__step-number">1</div>
-        <span class="how-it-works__step-icon">📥</span>
-        <h3 class="how-it-works__step-title">输入单词</h3>
-        <p class="how-it-works__step-desc">
-          输入你今天想学习或复习的雅思词汇，支持一次添加多个单词
-        </p>
+    <div class="hero__editorial">
+      <div class="hero__editorial-copy">
+        <h2 id="closing-title" class="hero__editorial-title">
+          <span>One more listen.</span>
+          <span class="hero__title-question">That’s how recognition begins.</span>
+        </h2>
       </div>
-
-      <!-- Step 2 -->
-      <div class="how-it-works__step">
-        <div class="how-it-works__step-number">2</div>
-        <span class="how-it-works__step-icon">🤖</span>
-        <h3 class="how-it-works__step-title">AI 生成听力</h3>
-        <p class="how-it-works__step-desc">
-          AI 自动将单词融入真实雅思场景，生成听力原文和音频材料
-        </p>
-      </div>
-
-      <!-- Step 3 -->
-      <div class="how-it-works__step">
-        <div class="how-it-works__step-number">3</div>
-        <span class="how-it-works__step-icon">🎧</span>
-        <h3 class="how-it-works__step-title">播放 + 回听</h3>
-        <p class="how-it-works__step-desc">
-          调整音量和倍速反复播放，并结合原文与目标词进行听力练习
-        </p>
-      </div>
+      <a href="#generator" class="hero__editorial-cta">Start listening <span aria-hidden="true">→</span></a>
     </div>
   </section>
-
-  <!-- ========================================
-       FOOTER
-       ======================================== -->
-  <footer class="footer">
-    <div class="footer__inner">
-      <!-- Brand -->
-      <div class="footer__brand">
-        <span class="footer__brand-icon">🎧</span>
-        My IELTS <span class="footer__brand-accent">AI</span>
-      </div>
-
-      <!-- Links -->
-      <div class="footer__links">
-        <a href="#generator" class="footer__link">AI 听力</a>
-        <a href="#how-it-works" class="footer__link">学习流程</a>
-      </div>
-
-      <!-- Copyright -->
-      <span class="footer__copy">&copy; 2026 My IELTS AI. All rights reserved.</span>
-
-      <!-- CTA -->
-      <a href="#generator" class="footer__cta">开始学习</a>
-    </div>
-  </footer>
 
   <!-- Scripts: AI Service Layer -->
   <script src="js/services/betaAccess.js"></script>

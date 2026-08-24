@@ -16,10 +16,10 @@
   };
 
   var VOICE_FLAG = {
-    'british-female': '🇬🇧',
-    'british-male': '🇬🇧',
-    'australian-female': '🇦🇺',
-    'american-female': '🇺🇸',
+    'british-female': 'GB',
+    'british-male': 'GB',
+    'australian-female': 'AU',
+    'american-female': 'US',
   };
 
   var VOICE_LABEL = {

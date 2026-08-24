@@ -193,43 +193,6 @@
   // We read the selected values at submit time.
 
   /* ========================================
-     Voice Sample Playback (placeholder)
-     ======================================== */
-
-  var currentSampleBtn = null;
-
-  document.querySelectorAll('.voice-card__sample').forEach(function (btn) {
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      // Toggle off if clicking the same one
-      if (currentSampleBtn === btn) {
-        btn.classList.remove('playing');
-        currentSampleBtn = null;
-        return;
-      }
-
-      // Stop previous
-      if (currentSampleBtn) {
-        currentSampleBtn.classList.remove('playing');
-      }
-
-      // Start this one
-      btn.classList.add('playing');
-      currentSampleBtn = btn;
-
-      // Auto-stop after 3 seconds (simulated sample length)
-      setTimeout(function () {
-        btn.classList.remove('playing');
-        if (currentSampleBtn === btn) {
-          currentSampleBtn = null;
-        }
-      }, 3000);
-    });
-  });
-
-  /* ========================================
      Submit Button
      ======================================== */
 

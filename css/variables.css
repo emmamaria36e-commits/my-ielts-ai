@@ -3,6 +3,14 @@
    ======================================== */
 
 :root {
+  --paper-color: #f4f0e7;
+  --paper-background:
+    linear-gradient(94deg, transparent 0 18%, rgba(65, 57, 46, 0.006) 18.1%, transparent 18.35% 67%, rgba(65, 57, 46, 0.004) 67.08%, transparent 67.24%),
+    linear-gradient(7deg, transparent 0 47%, rgba(255, 255, 255, 0.04) 47.1%, transparent 47.3%),
+    radial-gradient(ellipse at 16% 9%, rgba(255, 255, 255, 0.34), transparent 31%),
+    radial-gradient(ellipse at 82% 38%, rgba(63, 55, 43, 0.035), transparent 39%),
+    linear-gradient(102deg, rgba(255, 255, 255, 0.14), transparent 41%, rgba(39, 36, 31, 0.018));
+
   /* ── Brand Colors ── */
   --color-primary: #4F46E5;
   --color-primary-dark: #3730A3;
