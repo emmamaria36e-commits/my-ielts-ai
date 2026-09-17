@@ -911,6 +911,17 @@ async function handleRequest(request, response, context) {
     sendJson(response, 200, { ok: true });
     return;
   }
+  if (
+  (request.method === 'GET' || request.method === 'HEAD') &&
+  pathname === '/google5377ef3ba9d8e4a0.html'
+) {
+  await serveFile(
+    request,
+    response,
+    path.join(ROOT, 'google5377ef3ba9d8e4a0.html')
+  );
+  return;
+}
 
   if (request.method === 'POST' && pathname === '/api/generate') {
     const inviteIdentity = identifyBetaInvite(request, context.betaInviteRegistry);
