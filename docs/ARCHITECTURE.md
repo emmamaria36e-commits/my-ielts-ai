@@ -42,7 +42,7 @@ Browser
 ```text
 Browser
   → APIProvider
-  → X-Beta-Invite from tab-scoped sessionStorage
+  → X-Beta-Invite from the inline Beta Access field, cached in tab-scoped sessionStorage
   → Node validates the invite and derives an anonymous invite identifier
   → POST /api/generate with words, Section, Voice and difficulty
   → AI kill switch → existing IP rate limit → input validation
@@ -59,7 +59,7 @@ Browser
 ```text
 Browser
   → SpeechService
-  → X-Beta-Invite from tab-scoped sessionStorage
+  → X-Beta-Invite from the inline Beta Access field, cached in tab-scoped sessionStorage
   → Node validates the invite and derives an anonymous invite identifier
   → POST /api/speech with validated passage text and one trusted voice key
   → Speech kill switch → existing IP rate limit → input validation

@@ -32,7 +32,7 @@
 
     <div class="navbar__links">
       <a href="#generator" class="navbar__link">AI 听力</a>
-      <a href="#how-it-works" class="navbar__link">学习流程</a>
+      <a href="#how-it-works" class="navbar__link">怎么用</a>
     </div>
 
   </nav>
@@ -272,9 +272,10 @@
             aria-label="Enter target words"
           ></textarea>
         </div>
-        <p class="tag-input-hint">
-          Tip: 10–20 words work best for natural dialogues.
-        </p>
+        <div class="tag-input-help">
+          <p class="tag-input-hint">Tip: 10–20 words work best for natural dialogues.</p>
+          <p class="tag-input-guidance">输入你认识，但在真实语流中听到时反应不过来的单词。支持逗号或换行分隔。</p>
+        </div>
         <p class="tag-input-status" id="tagInputStatus" role="status" aria-live="polite"></p>
       </div>
 
@@ -290,28 +291,40 @@
             <input type="radio" name="section" id="section-1" value="section-1" class="scene-card__input" checked>
             <label for="section-1" class="scene-card__label">
               <span class="scene-card__number">01</span>
-              <span class="scene-card__name">Everyday<br>Conversation</span>
+              <span class="scene-card__copy">
+                <span class="scene-card__name">Everyday<br>Conversation</span>
+                <span class="scene-card__description">日常双人对话</span>
+              </span>
             </label>
           </div>
           <div class="scene-card">
             <input type="radio" name="section" id="section-2" value="section-2" class="scene-card__input">
             <label for="section-2" class="scene-card__label">
               <span class="scene-card__number">02</span>
-              <span class="scene-card__name">Social<br>Monologue</span>
+              <span class="scene-card__copy">
+                <span class="scene-card__name">Social<br>Monologue</span>
+                <span class="scene-card__description">生活场景独白</span>
+              </span>
             </label>
           </div>
           <div class="scene-card">
             <input type="radio" name="section" id="section-3" value="section-3" class="scene-card__input">
             <label for="section-3" class="scene-card__label">
               <span class="scene-card__number">03</span>
-              <span class="scene-card__name">Academic<br>Discussion</span>
+              <span class="scene-card__copy">
+                <span class="scene-card__name">Academic<br>Discussion</span>
+                <span class="scene-card__description">学术场景讨论</span>
+              </span>
             </label>
           </div>
           <div class="scene-card">
             <input type="radio" name="section" id="section-4" value="section-4" class="scene-card__input">
             <label for="section-4" class="scene-card__label">
               <span class="scene-card__number">04</span>
-              <span class="scene-card__name">Academic<br>Lecture</span>
+              <span class="scene-card__copy">
+                <span class="scene-card__name">Academic<br>Lecture</span>
+                <span class="scene-card__description">学术讲座</span>
+              </span>
             </label>
           </div>
         </div>
@@ -369,9 +382,38 @@
         <img src="assets/ink/ink-divider-line.png" alt="" draggable="false">
       </div>
 
-      <!-- ===== Step 4: Generate Button ===== -->
-      <div class="generator__step">
+      <!-- ===== Step 4: Beta Access ===== -->
+      <div class="generator__step generator__step--beta-access">
+        <h3 class="generator__step-title"><span>04</span> — BETA ACCESS</h3>
+        <div class="beta-access">
+          <label class="beta-access__label" for="betaInviteInput">Beta 测试邀请码</label>
+          <div class="beta-access__input-frame">
+            <input
+              class="beta-access__input"
+              id="betaInviteInput"
+              type="text"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="输入测试邀请码"
+              aria-describedby="betaInviteHelp betaInviteStatus"
+              aria-invalid="false"
+            >
+          </div>
+          <p class="beta-access__help" id="betaInviteHelp">当前为 Beta 测试版，请输入测试邀请码后生成。</p>
+          <p class="beta-access__privacy">邀请码仅用于控制测试额度，请勿在此输入密码、验证码或其他个人敏感信息。</p>
+          <p class="beta-access__status" id="betaInviteStatus" role="alert" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="generator__divider generator__divider--ink-asset" aria-hidden="true">
+        <img src="assets/ink/ink-divider-line.png" alt="" draggable="false">
+      </div>
+
+      <!-- ===== Generate Button ===== -->
+      <div class="generator__step generator__step--submit">
         <div class="generator__submit-wrapper">
+          <p class="generator__submit-note">将根据你的目标词、场景和语音生成一段 IELTS 难度的听力材料。</p>
           <button class="generator__submit" id="generateBtn" disabled>
             <span class="generator__submit-spinner" aria-hidden="true"></span>
             <span class="generator__submit-text">Generate listening material</span>
@@ -501,13 +543,27 @@
         </div>
       </div>
 
+      <div class="result-card__divider" aria-hidden="true">
+        <img src="assets/ink/ink-divider-line.png" alt="" draggable="false">
+      </div>
+
+      <div class="result-card__section result-card__section--practice">
+        <h3 class="result-card__section-label"><span>04</span> — RECOMMENDED PRACTICE</h3>
+        <ol class="recommended-practice">
+          <li><span>01</span>先盲听一遍</li>
+          <li><span>02</span>对照文本确认没听出的部分</li>
+          <li><span>03</span>再听一遍</li>
+          <li><span>04</span>留意目标词在真实语流中的声音</li>
+        </ol>
+      </div>
+
     </div>
   </section>
 
   <!-- ========================================
        HOW IT WORKS
        ======================================== -->
-  <section id="how-it-works" class="how-it-works hero" aria-labelledby="closing-title">
+  <section id="how-it-works" class="how-it-works hero" aria-labelledby="how-title">
     <svg class="generator__paper-grain" aria-hidden="true">
       <rect width="100%" height="100%" filter="url(#generator-paper-grain)" />
     </svg>
@@ -522,14 +578,50 @@
       </g>
     </svg>
 
-    <div class="hero__editorial">
-      <div class="hero__editorial-copy">
-        <h2 id="closing-title" class="hero__editorial-title">
+    <div class="how-it-works__inner">
+      <header class="how-it-works__header">
+        <p class="how-it-works__kicker">HOW TO USE / 学习流程</p>
+        <h2 id="how-title" class="how-it-works__title">Train recognition,<br>not just recall.</h2>
+      </header>
+
+      <ol class="how-it-works__steps">
+        <li class="how-it-works__step">
+          <span class="how-it-works__number">01</span>
+          <div>
+            <h3>输入目标词</h3>
+            <p>放入那些“看得懂，但听到时反应慢”的词。</p>
+          </div>
+        </li>
+        <li class="how-it-works__step">
+          <span class="how-it-works__number">02</span>
+          <div>
+            <h3>生成真实语境</h3>
+            <p>选择 IELTS Listening Section 和声音，让 AI 把目标词放进自然的听力材料中。</p>
+          </div>
+        </li>
+        <li class="how-it-works__step">
+          <span class="how-it-works__number">03</span>
+          <div>
+            <h3>先听，不看文本</h3>
+            <p>第一遍只听，看看自己能否在真实语流中识别目标词。</p>
+          </div>
+        </li>
+        <li class="how-it-works__step">
+          <span class="how-it-works__number">04</span>
+          <div>
+            <h3>对照，再听一次</h3>
+            <p>查看文本确认遗漏位置，然后重新播放。</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="how-it-works__closing">
+        <h2 class="hero__editorial-title">
           <span>One more listen.</span>
           <span class="hero__title-question">That’s how recognition begins.</span>
         </h2>
+        <a href="#generator" class="hero__editorial-cta">Start listening <span aria-hidden="true">→</span></a>
       </div>
-      <a href="#generator" class="hero__editorial-cta">Start listening <span aria-hidden="true">→</span></a>
     </div>
   </section>
 

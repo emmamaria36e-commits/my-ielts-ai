@@ -377,16 +377,41 @@ function loadBetaAccess(options = {}) {
   const source = fs.readFileSync(sourcePath, 'utf8');
   const storage = new Map(Object.entries(options.storage || {}));
   const requests = [];
-  const prompts = (options.prompts || []).slice();
   const responses = (options.responses || [{ status: 200 }]).slice();
   const alerts = [];
+  const prompts = [];
+  const inputListeners = new Map();
+  const statusClasses = new Set();
+  const inviteInput = {
+    value: options.inputValue || '',
+    focused: false,
+    attributes: new Map(),
+    addEventListener: (name, handler) => inputListeners.set(name, handler),
+    focus() { this.focused = true; },
+    setAttribute(name, value) { this.attributes.set(name, value); },
+  };
+  const inviteStatus = {
+    textContent: '',
+    classList: {
+      toggle(name, enabled) {
+        if (enabled) statusClasses.add(name);
+        else statusClasses.delete(name);
+      },
+    },
+  };
   const browserWindow = {
     alert: (message) => alerts.push(message),
     fetch: (url, requestOptions) => {
       requests.push({ url, options: requestOptions });
       return Promise.resolve(responses.shift() || { status: 200 });
     },
-    prompt: () => prompts.shift() ?? null,
+    prompt: (message) => prompts.push(message),
+    document: {
+      getElementById: (id) => ({
+        betaInviteInput: inviteInput,
+        betaInviteStatus: inviteStatus,
+      })[id] || null,
+    },
     sessionStorage: {
       getItem: (key) => storage.get(key) || null,
       removeItem: (key) => storage.delete(key),
@@ -395,11 +420,21 @@ function loadBetaAccess(options = {}) {
   };
   const sandbox = { window: browserWindow, Promise, Error, Object };
   vm.runInNewContext(source, sandbox, { filename: sourcePath });
-  return { alerts, requests, storage, BetaAccess: browserWindow.BetaAccess };
+  return {
+    alerts,
+    prompts,
+    requests,
+    storage,
+    inviteInput,
+    inviteStatus,
+    statusClasses,
+    inputListeners,
+    BetaAccess: browserWindow.BetaAccess,
+  };
 }
 
-test('frontend stores the first invite in sessionStorage and sends the beta header', async () => {
-  const browser = loadBetaAccess({ prompts: [' first-session-invite '] });
+test('frontend stores the inline invite in sessionStorage and sends the beta header', async () => {
+  const browser = loadBetaAccess({ inputValue: ' first-session-invite ' });
   const response = await browser.BetaAccess.fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -408,22 +443,49 @@ test('frontend stores the first invite in sessionStorage and sends the beta head
   assert.equal(response.status, 200);
   assert.equal(browser.requests[0].options.headers['X-Beta-Invite'], 'first-session-invite');
   assert.equal(browser.storage.get('my-ielts-ai-beta-invite'), 'first-session-invite');
+  assert.equal(browser.prompts.length, 0);
+  assert.equal(browser.alerts.length, 0);
 });
 
-test('frontend clears a rejected invite and retries once with a replacement', async () => {
+test('frontend restores a tab-scoped invite into the inline field', () => {
   const browser = loadBetaAccess({
-    storage: { 'my-ielts-ai-beta-invite': 'expired-session-invite' },
-    prompts: ['replacement-session-invite'],
-    responses: [{ status: 403 }, { status: 200 }],
+    storage: { 'my-ielts-ai-beta-invite': 'session-invite' },
+  });
+
+  assert.equal(browser.inviteInput.value, 'session-invite');
+});
+
+test('frontend blocks an empty inline invite before making a request', async () => {
+  const browser = loadBetaAccess();
+
+  await assert.rejects(
+    browser.BetaAccess.fetch('/api/generate', { method: 'POST' }),
+    /请输入测试邀请码后再生成/
+  );
+
+  assert.equal(browser.requests.length, 0);
+  assert.equal(browser.inviteInput.focused, true);
+  assert.equal(browser.inviteInput.attributes.get('aria-invalid'), 'true');
+  assert.equal(browser.inviteStatus.textContent, '请输入测试邀请码后再生成。');
+  assert.equal(browser.statusClasses.has('is-error'), true);
+});
+
+test('frontend clears a rejected inline invite without prompting or retrying', async () => {
+  const browser = loadBetaAccess({
+    inputValue: 'expired-session-invite',
+    responses: [{ status: 403 }],
   });
   const response = await browser.BetaAccess.fetch('/api/speech', { method: 'POST' });
 
-  assert.equal(response.status, 200);
-  assert.equal(browser.requests.length, 2);
+  assert.equal(response.status, 403);
+  assert.equal(browser.requests.length, 1);
   assert.equal(browser.requests[0].options.headers['X-Beta-Invite'], 'expired-session-invite');
-  assert.equal(browser.requests[1].options.headers['X-Beta-Invite'], 'replacement-session-invite');
-  assert.deepEqual(browser.alerts, ['测试邀请码无效或已失效，请重新输入。']);
-  assert.equal(browser.storage.get('my-ielts-ai-beta-invite'), 'replacement-session-invite');
+  assert.equal(browser.storage.has('my-ielts-ai-beta-invite'), false);
+  assert.equal(browser.inviteInput.value, '');
+  assert.equal(browser.inviteInput.focused, true);
+  assert.equal(browser.inviteStatus.textContent, '测试邀请码无效或已失效，请重新输入。');
+  assert.equal(browser.prompts.length, 0);
+  assert.equal(browser.alerts.length, 0);
 });
 
 test('per-invite AI daily quota rejects before another provider call', async () => {
@@ -761,15 +823,15 @@ test('frontend does not automatically retry a 503 response', async () => {
   assert.equal(browser.alerts.length, 0);
 });
 
-test('frontend retries 403 at most once', async () => {
+test('frontend does not retry a 403 response', async () => {
   const browser = loadBetaAccess({
     storage: { 'my-ielts-ai-beta-invite': 'expired-invite' },
-    prompts: ['replacement-invite', 'must-not-be-requested'],
-    responses: [{ status: 403 }, { status: 403 }],
+    responses: [{ status: 403 }],
   });
   assert.equal((await browser.BetaAccess.fetch('/api/generate')).status, 403);
-  assert.equal(browser.requests.length, 2);
-  assert.equal(browser.alerts.length, 2);
+  assert.equal(browser.requests.length, 1);
+  assert.equal(browser.alerts.length, 0);
+  assert.equal(browser.prompts.length, 0);
   assert.equal(browser.storage.has('my-ielts-ai-beta-invite'), false);
 });
 

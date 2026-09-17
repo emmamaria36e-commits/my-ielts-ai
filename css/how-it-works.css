@@ -1,7 +1,165 @@
 /* ========================================
-   Minimal closing page
+   How to use — editorial learning flow
    ======================================== */
 
-.how-it-works {
+.how-it-works.hero {
+  display: block;
+  min-height: auto;
+  padding: clamp(5rem, 8vw, 8rem) clamp(1.25rem, 6vw, 6rem);
   isolation: isolate;
+  scroll-margin-top: var(--navbar-height);
+}
+
+.how-it-works__inner {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1120px);
+  margin-inline: auto;
+}
+
+.how-it-works__header {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.28fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 3vw, 3rem);
+  align-items: end;
+  padding-bottom: clamp(2rem, 4vw, 3.5rem);
+}
+
+.how-it-works__kicker {
+  margin: 0;
+  padding-bottom: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.02em;
+}
+
+.how-it-works__title {
+  max-width: 820px;
+  margin: 0;
+  font-family: 'Arial Black', 'Segoe UI Black', Impact, sans-serif;
+  font-size: clamp(2.35rem, 5vw, 5rem);
+  font-weight: 900;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+
+.how-it-works__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.how-it-works__step {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(170px, 0.28fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 3vw, 3rem);
+  padding: clamp(1.35rem, 2.4vw, 2.1rem) 0;
+}
+
+.how-it-works__step::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 7px;
+  background: url('../assets/ink/ink-divider-line.png') center / 100% 7px no-repeat;
+  pointer-events: none;
+}
+
+.how-it-works__number {
+  padding-top: 0.12rem;
+  color: #625e56;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.05rem;
+}
+
+.how-it-works__step h3 {
+  margin: 0 0 0.35rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.how-it-works__step p {
+  max-width: 700px;
+  margin: 0;
+  color: #625e56;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(0.9rem, 1.15vw, 1.02rem);
+  line-height: 1.65;
+}
+
+.how-it-works__closing {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-8);
+  margin-top: clamp(2rem, 5vw, 4rem);
+  padding-top: clamp(2.4rem, 5vw, 4rem);
+}
+
+.how-it-works__closing::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 8px;
+  background: url('../assets/ink/ink-divider-line.png') center / 100% 8px no-repeat;
+  pointer-events: none;
+}
+
+.how-it-works__closing .hero__editorial-title {
+  max-width: 760px;
+  font-size: clamp(2.35rem, 5vw, 5rem);
+}
+
+.how-it-works__closing .hero__editorial-cta {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .how-it-works.hero {
+    padding: 4rem 1rem;
+  }
+
+  .how-it-works__header,
+  .how-it-works__step {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.8rem;
+  }
+
+  .how-it-works__header {
+    padding-bottom: 2rem;
+  }
+
+  .how-it-works__title {
+    font-size: clamp(2.15rem, 12vw, 3.3rem);
+  }
+
+  .how-it-works__step {
+    padding: 1.4rem 0;
+  }
+
+  .how-it-works__closing {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .how-it-works__closing .hero__editorial-title {
+    font-size: clamp(2rem, 10vw, 3rem);
+  }
+
+  .how-it-works__closing .hero__editorial-cta {
+    align-self: flex-end;
+  }
 }

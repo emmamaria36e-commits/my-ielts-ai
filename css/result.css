@@ -212,7 +212,8 @@
 
 .result-card__section--audio .result-card__section-label,
 .result-card__section--transcript .result-card__section-label,
-.result-card__section--target-words .result-card__section-label {
+.result-card__section--target-words .result-card__section-label,
+.result-card__section--practice .result-card__section-label {
   padding-top: 0.35rem;
   color: #191816;
   font-family: var(--font-mono);
@@ -571,6 +572,37 @@
   font-size: 10px;
 }
 
+/* ========================================
+   Recommended Practice
+   ======================================== */
+
+.recommended-practice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #403d37;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.recommended-practice li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  min-width: 0;
+  line-height: 1.55;
+}
+
+.recommended-practice li span {
+  flex: 0 0 auto;
+  color: #777168;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+}
+
 /* ── Responsive ── */
 @media (max-width: 767px) {
   .result-card {
@@ -580,5 +612,10 @@
   .result-card__section {
     grid-template-columns: minmax(0, 1fr);
     row-gap: var(--space-4);
+  }
+
+  .recommended-practice {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.45rem;
   }
 }

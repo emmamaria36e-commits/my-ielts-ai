@@ -218,6 +218,7 @@
 
   submitBtn.addEventListener('click', function () {
     if (words.length === 0 || submitBtn.classList.contains('loading')) return;
+    if (!window.BetaAccess.requireInvite()) return;
 
     // Collect selected IELTS section
     var sectionInput = document.querySelector('input[name="section"]:checked');
@@ -263,16 +264,16 @@
 
         // Keep any previous successful result visible and avoid exposing
         // provider/validation details in the transcript area.
-        setTagInputStatus(
-          error && error.status === 403
-            ? '测试邀请码无效或已失效，请重新输入。'
-            : error && error.status === 429
+        if (!error || error.status !== 403) {
+          setTagInputStatus(
+            error && error.status === 429
               ? '请求过于频繁或今日测试额度已用完，请稍后再试。'
               : error && error.status === 503
                 ? '该功能暂时不可用，请稍后再试。'
-            : '本次暂未生成成功，请再次点击 Generate。',
-          'error'
-        );
+                : '本次暂未生成成功，请再次点击 Generate。',
+            'error'
+          );
+        }
       });
   });
 
@@ -450,6 +451,10 @@
         window.clearTimeout(longSpeechTimer);
         if (window._activePlayer !== player) return;
         console.error('[Generator] Speech generation failed:', error);
+        if (error && error.status === 403) {
+          setAudioStatus('', false);
+          return;
+        }
         setAudioStatus(
           error && error.message ? error.message : '语音生成失败，请稍后重试。',
           true
